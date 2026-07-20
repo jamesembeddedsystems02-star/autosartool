@@ -1,0 +1,24 @@
+# Example configuration for a REAL HIL bench driving a physical BMS ECU.
+#
+# Requires:  pip install python-can  and a supported CAN adapter.
+# The device-under-test is the real ECU on the bus, so the built-in ECU stub
+# is disabled automatically when backend != virtual.
+
+can:
+  backend: python-can
+  # Pick the python-can interface for your adapter:
+  #   socketcan (Linux), pcan (PEAK), vector (Vector), kvaser, virtual (loopback)
+  python_can_interface: socketcan
+  channel: can0
+  bitrate: 500000
+
+schedule:
+  step_ms: 10.0
+  realtime: true            # pace to wall clock so ECU timing is respected
+
+# Match these limits to the ECU's calibration so pass/fail reflects real specs.
+ecu:
+  cell_overvoltage_v: 4.20
+  cell_undervoltage_v: 2.80
+  over_temp_c: 55.0
+  over_current_discharge_a: 200.0

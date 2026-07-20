@@ -1,0 +1,26 @@
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+*.egg
+
+# Test / coverage / reports
+.pytest_cache/
+.coverage
+htmlcov/
+reports/
+*.xml
+!.github/**/*.xml
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store

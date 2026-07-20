@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bms-hil"
+version = "0.1.0"
+description = "Hardware-in-the-Loop test tool for Battery Management System (BMS) ECUs"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "BMS HIL Tool" }]
+keywords = ["battery", "bms", "hil", "hardware-in-the-loop", "can", "automotive", "ecu", "testing"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Scientific/Engineering",
+    "Intended Audience :: Developers",
+]
+
+# The core self-test / simulation path is pure standard library.
+dependencies = []
+
+[project.optional-dependencies]
+# Real bench + richer analysis. Install with:  pip install -e ".[full]"
+hardware = ["python-can>=4.0"]
+config = ["pyyaml>=6.0"]
+analysis = ["numpy>=1.23", "matplotlib>=3.6"]
+full = ["python-can>=4.0", "pyyaml>=6.0", "numpy>=1.23", "matplotlib>=3.6"]
+dev = ["pytest>=7.0", "pytest-cov>=4.0", "pyyaml>=6.0"]
+
+[project.scripts]
+bms-hil = "bms_hil.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+pythonpath = ["src"]

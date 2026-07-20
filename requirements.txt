@@ -1,0 +1,12 @@
+# Runtime requirements for the BMS HIL tool.
+#
+# The core simulation and self-test path uses ONLY the Python standard library,
+# so this file is intentionally light. The packages below unlock optional
+# features; none are required just to run `python -m bms_hil selftest`.
+
+# YAML configuration files (JSON works without this).
+pyyaml>=6.0
+
+# Real HIL bench support (Vector, PCAN, SocketCAN, ...). Not needed for the
+# built-in virtual CAN bus used by the simulator / CI.
+python-can>=4.0

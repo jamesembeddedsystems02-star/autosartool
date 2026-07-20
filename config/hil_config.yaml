@@ -1,0 +1,45 @@
+# BMS HIL bench configuration.
+# Every key is optional; anything omitted falls back to the built-in defaults
+# (see bms_hil.core.config.DEFAULT_CONFIG). Pass with:  bms-hil -c config/hil_config.yaml test
+
+pack:
+  series_cells: 12          # cells in series (defines pack nominal voltage)
+  parallel_strings: 1       # parallel strings per series element
+  nominal_capacity_ah: 50.0 # usable capacity per cell
+  initial_soc: 0.55         # 0..1
+  initial_temp_c: 25.0
+
+cell:
+  internal_resistance_ohm: 0.0025
+  rc_resistance_ohm: 0.0015
+  rc_capacitance_f: 5000.0
+  thermal_mass_j_per_k: 850.0
+  thermal_resistance_k_per_w: 5.0
+  ambient_temp_c: 25.0
+
+ecu:
+  cell_overvoltage_v: 4.20
+  cell_undervoltage_v: 2.80
+  over_temp_c: 55.0
+  under_temp_c: -10.0
+  over_current_charge_a: 150.0
+  over_current_discharge_a: 200.0
+  balancing_start_delta_v: 0.030
+  balancing_current_a: 0.10
+
+can:
+  backend: virtual          # "virtual" (built-in, no hardware) or "python-can"
+  channel: hil0
+  bitrate: 500000
+  python_can_interface: virtual  # e.g. socketcan / pcan / vector for real benches
+
+schedule:
+  step_ms: 10.0             # control/simulation step
+  realtime: false           # true paces the loop to wall-clock time
+
+logging:
+  level: INFO
+  signal_log: true
+
+report:
+  output_dir: reports
