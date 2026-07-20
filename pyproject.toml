@@ -25,9 +25,10 @@ dependencies = []
 # Real bench + richer analysis. Install with:  pip install -e ".[full]"
 hardware = ["python-can>=4.0"]
 config = ["pyyaml>=6.0"]
+dbc = ["cantools>=39.0"]
 analysis = ["numpy>=1.23", "matplotlib>=3.6"]
-full = ["python-can>=4.0", "pyyaml>=6.0", "numpy>=1.23", "matplotlib>=3.6"]
-dev = ["pytest>=7.0", "pytest-cov>=4.0", "pyyaml>=6.0"]
+full = ["python-can>=4.0", "pyyaml>=6.0", "cantools>=39.0", "numpy>=1.23", "matplotlib>=3.6"]
+dev = ["pytest>=7.0", "pytest-cov>=4.0", "pyyaml>=6.0", "cantools>=39.0", "matplotlib>=3.6"]
 
 [project.scripts]
 bms-hil = "bms_hil.cli:main"
@@ -35,7 +36,31 @@ bms-hil = "bms_hil.cli:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+bms_hil = ["py.typed"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
 pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests use pytest.importorskip before imports (E402) intentionally.
+"tests/*" = ["E402"]
+# The HTML report embeds a CSS template with intentionally long style lines.
+"src/bms_hil/report/report_generator.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+warn_unused_ignores = false
+check_untyped_defs = true
+files = ["src"]

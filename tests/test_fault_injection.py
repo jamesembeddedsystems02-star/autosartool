@@ -1,10 +1,10 @@
 from bms_hil.core.config import Config
-from bms_hil.plant.battery_pack import BatteryPack
 from bms_hil.faults import (
     CellVoltageOffsetFault,
-    OpenCircuitFault,
     FaultInjector,
+    OpenCircuitFault,
 )
+from bms_hil.plant.battery_pack import BatteryPack
 
 
 def _pack():

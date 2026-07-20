@@ -37,11 +37,17 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "nominal_capacity_ah": 50.0,  # per-cell usable capacity
         "initial_soc": 0.55,         # 0..1
         "initial_temp_c": 25.0,
+        "soh": 1.0,                  # pack state of health (capacity fade)
+        "isolation_resistance_kohm": 50000.0,  # HV-to-chassis isolation
     },
     "cell": {
         "internal_resistance_ohm": 0.0025,
         "rc_resistance_ohm": 0.0015,
         "rc_capacitance_f": 5000.0,
+        "rc2_resistance_ohm": 0.0008,   # second (slow) RC branch
+        "rc2_capacitance_f": 60000.0,
+        "r0_temp_coeff_per_c": 0.008,   # R0 rise per degC below reference
+        "r0_soh_growth": 0.5,           # R0 growth fraction at SOH=0
         "thermal_mass_j_per_k": 850.0,
         "thermal_resistance_k_per_w": 5.0,
         "ambient_temp_c": 25.0,
@@ -56,12 +62,16 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "over_current_discharge_a": 200.0,
         "balancing_start_delta_v": 0.030,
         "balancing_current_a": 0.10,
+        "critical_temp_c": 70.0,         # thermal-runaway warning threshold
+        "isolation_min_kohm": 500.0,     # below this -> isolation fault
+        "precharge_time_s": 0.2,         # precharge dwell before main contactor
     },
     "can": {
         "backend": "virtual",        # "virtual" (built-in) or "python-can"
         "channel": "hil0",
         "bitrate": 500000,
         "python_can_interface": "virtual",  # used only when backend=python-can
+        "dbc_path": None,            # optional .dbc (needs cantools); None = built-in DB
     },
     "schedule": {
         "step_ms": 10.0,             # simulation/control step

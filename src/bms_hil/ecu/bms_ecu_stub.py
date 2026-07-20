@@ -5,12 +5,14 @@ bus; the tool's job is to stimulate it and check its responses. To let the
 whole toolchain run and be tested with no hardware, this module implements a
 *reference* BMS ECU with the control logic a real one would have:
 
-* reads simulated cell voltages/temperatures/current from the plant messages,
-* estimates pack SOC,
-* enforces protection limits (OV/UV/OT/UT/OC) and opens the main contactor on a
-  latching fault,
+* reads simulated cell voltages/temperatures/current and isolation resistance
+  from the plant messages,
+* estimates pack SOC and reports SOH + available charge/discharge power (SOX),
+* enforces protection limits (OV/UV/OT/UT/OC/ISO) and opens the main contactor
+  on a latching fault, with a two-step precharge before closing,
+* flags thermal runaway above a critical temperature,
 * commands passive cell balancing above a delta-V threshold,
-* publishes ``BMS_PackStatus`` and ``BMS_LimitsStatus`` periodically,
+* publishes ``BMS_PackStatus``, ``BMS_LimitsStatus`` and ``BMS_SohStatus``,
 * answers a small set of UDS diagnostic requests.
 
 Swap this out for a real ECU by pointing the CAN backend at hardware; the
@@ -23,16 +25,22 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 from ..core.logging_setup import get_logger
+from ..io import uds_client as uds
 from ..io.can_interface import CanBus, CanFrame
 from ..io.signal_db import (
+    MSG_CELL_VOLTAGES,
+    MSG_ISOLATION_STATUS,
+    MSG_TESTER_COMMAND,
     SignalDatabase,
     default_bms_database,
-    MSG_CELL_VOLTAGES,
-    MSG_TESTER_COMMAND,
 )
-from ..io import uds_client as uds
 
 log = get_logger("bms_hil.ecu")
+
+# Contactor state machine.
+CONTACTOR_OPEN = "OPEN"
+CONTACTOR_PRECHARGE = "PRECHARGE"
+CONTACTOR_CLOSED = "CLOSED"
 
 
 class FaultBits:
@@ -46,23 +54,25 @@ class FaultBits:
     OVERCURRENT_DISCHARGE = 1 << 5
     CELL_IMBALANCE = 1 << 6
     SENSOR_FAULT = 1 << 7
+    ISOLATION = 1 << 8
+    THERMAL_RUNAWAY = 1 << 9
+
+    _ALL = [
+        ("OVERVOLTAGE", OVERVOLTAGE),
+        ("UNDERVOLTAGE", UNDERVOLTAGE),
+        ("OVERTEMP", OVERTEMP),
+        ("UNDERTEMP", UNDERTEMP),
+        ("OVERCURRENT_CHARGE", OVERCURRENT_CHARGE),
+        ("OVERCURRENT_DISCHARGE", OVERCURRENT_DISCHARGE),
+        ("CELL_IMBALANCE", CELL_IMBALANCE),
+        ("SENSOR_FAULT", SENSOR_FAULT),
+        ("ISOLATION", ISOLATION),
+        ("THERMAL_RUNAWAY", THERMAL_RUNAWAY),
+    ]
 
     @staticmethod
     def names(flags: int) -> List[str]:
-        out = []
-        for name, bit in [
-            ("OVERVOLTAGE", FaultBits.OVERVOLTAGE),
-            ("UNDERVOLTAGE", FaultBits.UNDERVOLTAGE),
-            ("OVERTEMP", FaultBits.OVERTEMP),
-            ("UNDERTEMP", FaultBits.UNDERTEMP),
-            ("OVERCURRENT_CHARGE", FaultBits.OVERCURRENT_CHARGE),
-            ("OVERCURRENT_DISCHARGE", FaultBits.OVERCURRENT_DISCHARGE),
-            ("CELL_IMBALANCE", FaultBits.CELL_IMBALANCE),
-            ("SENSOR_FAULT", FaultBits.SENSOR_FAULT),
-        ]:
-            if flags & bit:
-                out.append(name)
-        return out
+        return [name for name, bit in FaultBits._ALL if flags & bit]
 
 
 @dataclass
@@ -75,6 +85,9 @@ class EcuThresholds:
     over_current_discharge_a: float = 200.0
     balancing_start_delta_v: float = 0.030
     balancing_current_a: float = 0.10
+    critical_temp_c: float = 70.0
+    isolation_min_kohm: float = 500.0
+    precharge_time_s: float = 0.2
 
     @classmethod
     def from_config_section(cls, section: dict) -> "EcuThresholds":
@@ -85,6 +98,8 @@ class EcuThresholds:
 DID_SOC = 0xF010
 DID_FAULT_FLAGS = 0xF011
 DID_MAX_CELL_TEMP = 0xF012
+DID_SOH = 0xF013
+DID_ISOLATION = 0xF014
 ROUTINE_CONTACTOR_SELFTEST = 0x0201
 
 
@@ -98,18 +113,22 @@ class BmsEcuStub:
     publish_period_s: float = 0.05
 
     # Runtime state
-    contactor_closed: bool = False
+    contactor_state: str = CONTACTOR_OPEN
     fault_flags: int = 0
     soc_pct: float = 55.0
+    soh_pct: float = 100.0
     pack_voltage_v: float = 0.0
     pack_current_a: float = 0.0
     max_cell_temp_c: float = 25.0
     min_cell_v: float = 3.7
     max_cell_v: float = 3.7
     cell_delta_v: float = 0.0
+    isolation_kohm: float = 50000.0
     balancing_active: bool = False
+    thermal_runaway: bool = False
     _counter: int = 0
     _since_publish_s: float = 0.0
+    _precharge_elapsed_s: float = 0.0
     _requested_current_a: float = 0.0
     _command: int = 0  # 0 idle, 1 charge, 2 discharge
 
@@ -117,10 +136,14 @@ class BmsEcuStub:
         # Contactor closes once the ECU has seen valid data and no faults.
         self._seen_data = False
 
+    @property
+    def contactor_closed(self) -> bool:
+        return self.contactor_state == CONTACTOR_CLOSED
+
     # ---- main control cycle ----------------------------------------------
     def step(self, dt_s: float) -> None:
         self._drain_rx()
-        self._run_protection()
+        self._run_protection(dt_s)
         self._run_balancing()
         self._since_publish_s += dt_s
         if self._since_publish_s >= self.publish_period_s:
@@ -134,6 +157,8 @@ class BmsEcuStub:
                 return
             if frame.arbitration_id == MSG_CELL_VOLTAGES:
                 self._on_cell_voltages(frame)
+            elif frame.arbitration_id == MSG_ISOLATION_STATUS:
+                self.isolation_kohm = self.db.decode(frame)["IsolationResistance"]
             elif frame.arbitration_id == MSG_TESTER_COMMAND:
                 self._on_tester_command(frame)
             elif frame.arbitration_id == 0x7E0:  # UDS request
@@ -155,7 +180,7 @@ class BmsEcuStub:
             self.clear_faults()
 
     # ---- protection & balancing ------------------------------------------
-    def _run_protection(self) -> None:
+    def _run_protection(self, dt_s: float) -> None:
         if not self._seen_data:
             return
         t = self.thresholds
@@ -169,12 +194,19 @@ class BmsEcuStub:
             flags |= FaultBits.OVERTEMP
         if self.max_cell_temp_c <= t.under_temp_c:
             flags |= FaultBits.UNDERTEMP
+        if self.max_cell_temp_c >= t.critical_temp_c:
+            flags |= FaultBits.THERMAL_RUNAWAY
+            self.thermal_runaway = True
 
         # Current sign: + = discharge, - = charge.
         if self.pack_current_a < -t.over_current_charge_a:
             flags |= FaultBits.OVERCURRENT_CHARGE
         if self.pack_current_a > t.over_current_discharge_a:
             flags |= FaultBits.OVERCURRENT_DISCHARGE
+
+        # Isolation monitoring.
+        if self.isolation_kohm < t.isolation_min_kohm:
+            flags |= FaultBits.ISOLATION
 
         # Plausibility / sensor fault: impossible cell voltage.
         if self.max_cell_v > 5.5 or self.min_cell_v < 0.5:
@@ -185,15 +217,23 @@ class BmsEcuStub:
             log.warning("ECU fault(s) asserted: %s", ", ".join(newly))
         self.fault_flags = flags
 
-        # Contactor logic: open (safe) on any latched fault; otherwise close
-        # once valid data has been seen.
+        # Contactor state machine: any latched fault forces OPEN. Otherwise
+        # run a precharge dwell before closing the main contactor.
         if self.fault_flags:
-            if self.contactor_closed:
+            if self.contactor_state != CONTACTOR_OPEN:
                 log.warning("ECU opening main contactor due to fault 0x%04X",
                             self.fault_flags)
-            self.contactor_closed = False
-        else:
-            self.contactor_closed = True
+            self.contactor_state = CONTACTOR_OPEN
+            self._precharge_elapsed_s = 0.0
+        elif self.contactor_state == CONTACTOR_OPEN:
+            self.contactor_state = CONTACTOR_PRECHARGE
+            self._precharge_elapsed_s = 0.0
+            log.info("ECU precharge started")
+        elif self.contactor_state == CONTACTOR_PRECHARGE:
+            self._precharge_elapsed_s += dt_s
+            if self._precharge_elapsed_s >= t.precharge_time_s:
+                self.contactor_state = CONTACTOR_CLOSED
+                log.info("ECU main contactor closed (precharge complete)")
 
     def _run_balancing(self) -> None:
         active = (
@@ -203,16 +243,25 @@ class BmsEcuStub:
         if active and not self.balancing_active:
             log.info("ECU starting cell balancing (delta=%.3f V)", self.cell_delta_v)
         self.balancing_active = active
-        if self.cell_delta_v >= self.thresholds.balancing_start_delta_v:
-            self.fault_flags |= 0  # imbalance is informational, not latching here
 
     # ---- publication ------------------------------------------------------
     def set_pack_measurements(self, pack_voltage_v: float, pack_current_a: float,
-                              soc_pct: float) -> None:
+                              soc_pct: float, soh_pct: Optional[float] = None) -> None:
         """Called by the HIL loop to hand the ECU pack-level analog inputs."""
         self.pack_voltage_v = pack_voltage_v
         self.pack_current_a = pack_current_a
         self.soc_pct = soc_pct
+        if soh_pct is not None:
+            self.soh_pct = soh_pct
+
+    def _available_power_kw(self) -> tuple:
+        """SOX: available charge/discharge power from limits and pack voltage."""
+        if self.fault_flags:
+            return 0.0, 0.0
+        v = max(0.0, self.pack_voltage_v)
+        charge_kw = v * self.thresholds.over_current_charge_a / 1000.0
+        discharge_kw = v * self.thresholds.over_current_discharge_a / 1000.0
+        return charge_kw, discharge_kw
 
     def _publish(self) -> None:
         self._counter = (self._counter + 1) & 0xFF
@@ -226,14 +275,25 @@ class BmsEcuStub:
         })
         self.bus.send(status)
 
+        max_charge = 0.0 if self.fault_flags else self.thresholds.over_current_charge_a
+        max_discharge = 0.0 if self.fault_flags else self.thresholds.over_current_discharge_a
         limits = self.db.encode("BMS_LimitsStatus", {
             "ContactorClosed": 1.0 if self.contactor_closed else 0.0,
             "FaultFlags": float(self.fault_flags),
             "MaxCellTemp": self.max_cell_temp_c,
-            "MaxChargeCurrent": 0.0 if self.fault_flags else self.thresholds.over_current_charge_a,
-            "MaxDischargeCurrent": 0.0 if self.fault_flags else self.thresholds.over_current_discharge_a,
+            "MaxChargeCurrent": max_charge,
+            "MaxDischargeCurrent": max_discharge,
         })
         self.bus.send(limits)
+
+        charge_kw, discharge_kw = self._available_power_kw()
+        soh = self.db.encode("BMS_SohStatus", {
+            "SOH": self.soh_pct,
+            "AvailChargePower": charge_kw,
+            "AvailDischargePower": discharge_kw,
+            "IsolationResistance": min(65535.0, self.isolation_kohm),
+        })
+        self.bus.send(soh)
 
     def _checksum(self) -> int:
         return (int(self.pack_voltage_v) + int(self.soc_pct) + self._counter) & 0xFF
@@ -243,6 +303,7 @@ class BmsEcuStub:
         if self.fault_flags:
             log.info("ECU clearing latched faults (was 0x%04X)", self.fault_flags)
         self.fault_flags = 0
+        self.thermal_runaway = False
 
     def _on_uds(self, frame: CanFrame) -> None:
         length = frame.data[0] & 0x0F
@@ -276,4 +337,9 @@ class BmsEcuStub:
             return head + bytes([(self.fault_flags >> 8) & 0xFF, self.fault_flags & 0xFF])
         if did == DID_MAX_CELL_TEMP:
             return head + bytes([int(round(self.max_cell_temp_c + 40)) & 0xFF])
+        if did == DID_SOH:
+            return head + bytes([int(round(self.soh_pct * 2)) & 0xFF])
+        if did == DID_ISOLATION:
+            iso = int(round(min(65535.0, self.isolation_kohm)))
+            return head + bytes([(iso >> 8) & 0xFF, iso & 0xFF])
         return None

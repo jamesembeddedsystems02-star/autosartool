@@ -10,3 +10,6 @@ pyyaml>=6.0
 # Real HIL bench support (Vector, PCAN, SocketCAN, ...). Not needed for the
 # built-in virtual CAN bus used by the simulator / CI.
 python-can>=4.0
+
+# DBC communication-matrix support (load a Vector .dbc as the signal database).
+cantools>=39.0

@@ -13,6 +13,8 @@ from ..core.bench import HilBench
 from ..core.config import Config
 from ..core.logging_setup import get_logger
 from ..io.can_interface import VirtualCanBus
+from ..report.data_logger import DataLogger
+from ..report.plots import plot_logger_datauri
 from ..report.report_generator import write_html_report, write_junit_xml
 from .test_case import HilTestCase, TestContext, TestResult
 
@@ -60,9 +62,12 @@ class TestRunner:
     def passed(self) -> bool:
         return all(r.status == "pass" for r in self.results)
 
-    def write_reports(self, output_dir: Optional[str] = None) -> dict:
+    def write_reports(self, output_dir: Optional[str] = None,
+                      trace_logger: Optional[DataLogger] = None) -> dict:
         out = output_dir or str(self.config.get("report.output_dir", "reports"))
         os.makedirs(out, exist_ok=True)
         xml = write_junit_xml(self.results, os.path.join(out, "junit.xml"))
-        htm = write_html_report(self.results, os.path.join(out, "report.html"))
+        trace_uri = plot_logger_datauri(trace_logger) if trace_logger else None
+        htm = write_html_report(self.results, os.path.join(out, "report.html"),
+                                trace_datauri=trace_uri)
         return {"junit": xml, "html": htm}

@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 import traceback
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List
 
 from ..core.bench import HilBench
 from ..core.logging_setup import get_logger

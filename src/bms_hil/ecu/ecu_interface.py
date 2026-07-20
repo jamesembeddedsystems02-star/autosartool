@@ -3,7 +3,8 @@
 The HIL tests never touch the ECU internals directly; they go through this
 interface, which:
 
-* sends the plant's simulated cell measurements to the ECU,
+* sends the plant's simulated cell measurements and isolation resistance to the
+  ECU,
 * sends tester commands (requested current, clear-faults),
 * listens for the ECU's periodic status messages and exposes the latest as a
   typed :class:`EcuStatus`.
@@ -11,15 +12,16 @@ interface, which:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import List, Optional
+from dataclasses import dataclass
+from typing import Optional
 
 from ..io.can_interface import CanBus
 from ..io.signal_db import (
+    MSG_LIMITS_STATUS,
+    MSG_PACK_STATUS,
+    MSG_SOH_STATUS,
     SignalDatabase,
     default_bms_database,
-    MSG_PACK_STATUS,
-    MSG_LIMITS_STATUS,
 )
 from ..plant.battery_pack import PackState
 
@@ -29,12 +31,16 @@ class EcuStatus:
     pack_voltage_v: float = 0.0
     pack_current_a: float = 0.0
     soc_pct: float = 0.0
+    soh_pct: float = 0.0
     mode: int = 0
     contactor_closed: bool = False
     fault_flags: int = 0
     max_cell_temp_c: float = 0.0
     max_charge_current_a: float = 0.0
     max_discharge_current_a: float = 0.0
+    avail_charge_power_kw: float = 0.0
+    avail_discharge_power_kw: float = 0.0
+    isolation_kohm: float = 0.0
     valid: bool = False
 
 
@@ -53,6 +59,10 @@ class EcuInterface:
             "MaxCellTemp": state.max_temp_c,
         })
         self.bus.send(frame)
+        iso = self.db.encode("SIM_IsolationStatus", {
+            "IsolationResistance": min(65535.0, state.isolation_kohm),
+        })
+        self.bus.send(iso)
 
     def send_command(self, requested_current_a: float, command: int = 0,
                      clear_faults: bool = False) -> None:
@@ -84,4 +94,10 @@ class EcuInterface:
                 self.status.max_cell_temp_c = vals["MaxCellTemp"]
                 self.status.max_charge_current_a = vals["MaxChargeCurrent"]
                 self.status.max_discharge_current_a = vals["MaxDischargeCurrent"]
+            elif frame.arbitration_id == MSG_SOH_STATUS:
+                vals = self.db.decode(frame)
+                self.status.soh_pct = vals["SOH"]
+                self.status.avail_charge_power_kw = vals["AvailChargePower"]
+                self.status.avail_discharge_power_kw = vals["AvailDischargePower"]
+                self.status.isolation_kohm = vals["IsolationResistance"]
         return self.status

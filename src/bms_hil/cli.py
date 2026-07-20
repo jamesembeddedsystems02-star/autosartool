@@ -46,6 +46,29 @@ def _load_config(args: argparse.Namespace) -> Config:
     return cfg
 
 
+def _capture_trace(cfg: Config):
+    """Run a short charge/discharge/fault sequence to embed in the report."""
+    from .core.bench import HilBench
+    from .scenarios.drive_cycle import DriveCycle
+
+    bench = HilBench(cfg)
+    try:
+        bench.settle(0.3)
+        cycle = DriveCycle.example()
+        t = 0.0
+        while t < cycle.duration:
+            i = cycle.current_at(t)
+            bench.command_current(i, mode=2 if i >= 0 else 1)
+            bench.run_for(0.1)
+            t += 0.1
+        # end with an overtemperature fault to show a protection event
+        bench.plant.cells[0].temp_offset_c = 50.0
+        bench.run_for(0.5)
+        return bench.logger
+    finally:
+        bench.shutdown()
+
+
 def cmd_test(cfg: Config, args: argparse.Namespace) -> int:
     from .scenarios import default_suite
     from .testing.test_runner import TestRunner
@@ -62,7 +85,8 @@ def cmd_test(cfg: Config, args: argparse.Namespace) -> int:
     runner = TestRunner(cfg)
     runner.run(tests)
     summary = runner.summary()
-    reports = runner.write_reports(args.output_dir)
+    trace = _capture_trace(cfg)
+    reports = runner.write_reports(args.output_dir, trace_logger=trace)
 
     log.info("-" * 60)
     log.info("RESULTS: %(total)d total | %(pass)d pass | %(fail)d fail | "
@@ -110,6 +134,13 @@ def cmd_demo(cfg: Config, args: argparse.Namespace) -> int:
         bench.logger.to_csv(csv_path)
         log.info("Signal trace written to %s (%d samples)",
                  csv_path, len(bench.logger.rows))
+
+        from .report.plots import have_matplotlib, plot_logger_png
+        if have_matplotlib():
+            png = plot_logger_png(bench.logger, os.path.join(out, "demo_trace.png"))
+            log.info("Trace plot written to %s", png)
+        else:
+            log.info("Install matplotlib to also render a PNG trace plot")
     finally:
         bench.shutdown()
     return 0

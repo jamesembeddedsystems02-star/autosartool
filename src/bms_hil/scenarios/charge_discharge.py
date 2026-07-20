@@ -45,7 +45,8 @@ class DischargeTest(HilTestCase):
 
         soc_after = ctx.plant.state.avg_soc
         ctx.check.less(soc_after, soc_before, "SOC decreased under discharge")
-        ctx.check.greater(ctx.status.pack_current_a, 0.0, "ECU reports positive (discharge) current")
+        ctx.check.greater(ctx.status.pack_current_a, 0.0,
+                          "ECU reports positive (discharge) current")
         ctx.check.equal(ctx.status.fault_flags, 0, "no faults during nominal discharge")
 
 

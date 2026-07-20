@@ -98,7 +98,9 @@ class SignalDatabase:
 # ---------------------------------------------------------------------------
 MSG_PACK_STATUS = 0x100
 MSG_LIMITS_STATUS = 0x101
+MSG_SOH_STATUS = 0x102
 MSG_CELL_VOLTAGES = 0x200
+MSG_ISOLATION_STATUS = 0x201
 MSG_TESTER_COMMAND = 0x300
 
 
@@ -129,6 +131,16 @@ def default_bms_database() -> SignalDatabase:
             ],
         ),
         Message(
+            name="BMS_SohStatus",
+            frame_id=MSG_SOH_STATUS,
+            signals=[
+                Signal("SOH", 0, 1, factor=0.5, unit="%"),
+                Signal("AvailChargePower", 1, 2, factor=0.01, unit="kW"),
+                Signal("AvailDischargePower", 3, 2, factor=0.01, unit="kW"),
+                Signal("IsolationResistance", 5, 2, factor=1.0, unit="kOhm"),
+            ],
+        ),
+        Message(
             name="SIM_CellVoltages",
             frame_id=MSG_CELL_VOLTAGES,
             signals=[
@@ -136,6 +148,13 @@ def default_bms_database() -> SignalDatabase:
                 Signal("MaxCellVoltage", 2, 2, factor=0.001, unit="V"),
                 Signal("CellDelta", 4, 2, factor=0.001, unit="V"),
                 Signal("MaxCellTemp", 6, 1, factor=1.0, offset=-40.0, unit="degC"),
+            ],
+        ),
+        Message(
+            name="SIM_IsolationStatus",
+            frame_id=MSG_ISOLATION_STATUS,
+            signals=[
+                Signal("IsolationResistance", 0, 2, factor=1.0, unit="kOhm"),
             ],
         ),
         Message(

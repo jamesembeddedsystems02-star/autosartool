@@ -6,7 +6,7 @@ import html
 import os
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
-from typing import List, TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional
 
 if TYPE_CHECKING:  # avoid a runtime import cycle
     from ..testing.test_case import TestResult
@@ -73,6 +73,8 @@ _HTML_TEMPLATE = """<!doctype html>
  .st.pass{{background:#2e7d32}} .st.fail{{background:#c62828}}
  .st.error{{background:#ef6c00}} .st.skip{{background:#616161}}
  pre{{white-space:pre-wrap;margin:.3rem 0 0;color:#444;font-size:.82rem}}
+ .trace{{margin:1.5rem 0}} .trace img{{max-width:100%;border:1px solid #ddd;border-radius:8px;background:#fff}}
+ h2{{margin:1.6rem 0 .4rem;font-size:1.1rem}}
 </style></head><body>
 <h1>BMS HIL Test Report</h1>
 <p class="sub">Generated {ts} &middot; total duration {dur:.2f}s</p>
@@ -87,11 +89,13 @@ _HTML_TEMPLATE = """<!doctype html>
 <tbody>
 {rows}
 </tbody></table>
+{trace}
 </body></html>
 """
 
 
-def write_html_report(results: List["TestResult"], path: str) -> str:
+def write_html_report(results: List["TestResult"], path: str,
+                      trace_datauri: Optional[str] = None) -> str:
     passed = sum(1 for r in results if r.status == "pass")
     failed = sum(1 for r in results if r.status == "fail")
     errors = sum(1 for r in results if r.status == "error")
@@ -111,10 +115,17 @@ def write_html_report(results: List["TestResult"], path: str) -> str:
             f'<td>{detail}</td></tr>'
         )
 
+    trace_html = ""
+    if trace_datauri:
+        trace_html = (
+            '<div class="trace"><h2>Signal trace</h2>'
+            f'<img alt="signal trace" src="{trace_datauri}"></div>'
+        )
+
     doc = _HTML_TEMPLATE.format(
         ts=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
         dur=duration, total=len(results), passed=passed, failed=failed,
-        errors=errors, skipped=skipped, rows="\n".join(rows),
+        errors=errors, skipped=skipped, rows="\n".join(rows), trace=trace_html,
     )
     _ensure_dir(path)
     with open(path, "w", encoding="utf-8") as fh:

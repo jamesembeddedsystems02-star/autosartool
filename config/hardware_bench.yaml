@@ -11,6 +11,8 @@ can:
   python_can_interface: socketcan
   channel: can0
   bitrate: 500000
+  # Point at your ECU's real communication matrix (requires cantools):
+  dbc_path: config/bms.dbc
 
 schedule:
   step_ms: 10.0

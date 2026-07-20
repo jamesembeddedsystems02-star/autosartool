@@ -27,6 +27,7 @@ from typing import Optional
 from ..ecu.bms_ecu_stub import BmsEcuStub, EcuThresholds
 from ..ecu.ecu_interface import EcuInterface
 from ..io.can_interface import CanBus, VirtualCanBus, create_bus
+from ..io.dbc import load_signal_database
 from ..plant.battery_pack import BatteryPack
 from ..report.data_logger import DataLogger
 from .config import Config
@@ -49,8 +50,12 @@ class HilBench:
             if use_internal_ecu is None else use_internal_ecu
         )
 
+        # One signal database (built-in, or a DBC when can.dbc_path is set),
+        # shared by the tester interface and the internal ECU.
+        self.db = load_signal_database(config)
+
         self.plant = BatteryPack(config)
-        self.interface = EcuInterface(self.tester_bus)
+        self.interface = EcuInterface(self.tester_bus, db=self.db)
         self.logger = DataLogger()
 
         self.ecu: Optional[BmsEcuStub] = None
@@ -60,6 +65,7 @@ class HilBench:
             self.ecu = BmsEcuStub(
                 bus=self.ecu_bus,
                 thresholds=EcuThresholds.from_config_section(config.section("ecu")),
+                db=self.db,
             )
 
         self.scheduler = Scheduler(
@@ -99,6 +105,7 @@ class HilBench:
                 pack_voltage_v=state.pack_voltage_v,
                 pack_current_a=state.current_a,
                 soc_pct=state.avg_soc * 100.0,
+                soh_pct=state.soh * 100.0,
             )
             # apply passive balancing bleed to the plant
             if self.ecu.balancing_active:
@@ -123,6 +130,8 @@ class HilBench:
             "max_cell_v": state.max_cell_v,
             "cell_delta_v": state.cell_delta_v,
             "max_temp_c": state.max_temp_c,
+            "isolation_kohm": state.isolation_kohm,
+            "soh_pct": state.soh * 100.0,
             "contactor_closed": 1.0 if status.contactor_closed else 0.0,
             "fault_flags": float(status.fault_flags),
         })

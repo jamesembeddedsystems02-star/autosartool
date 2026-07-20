@@ -20,21 +20,26 @@ switching one config line.
 
 ## Features
 
-- **Battery plant model** — per-cell 1st-order equivalent-circuit (Thevenin)
-  electrical model + lumped thermal model, aggregated into a series/parallel
-  pack (`bms_hil.plant`).
+- **Battery plant model** — per-cell 2nd-order equivalent-circuit (Thevenin,
+  2×RC) electrical model with temperature-dependent resistance and SOH capacity
+  fade, plus a lumped thermal model, aggregated into a series/parallel pack
+  (`bms_hil.plant`).
 - **CAN layer** — dependency-free in-process virtual bus, plus an optional
-  [`python-can`](https://python-can.readthedocs.io/) backend for real benches;
-  simple signal encode/decode database (`bms_hil.io`).
-- **Reference BMS ECU** — SOC estimation, OV/UV/OT/UT/OC protection, latching
-  faults, contactor control, passive cell balancing, and a small UDS
+  [`python-can`](https://python-can.readthedocs.io/) backend for real benches.
+  Signals come from a built-in encode/decode database **or** a real Vector
+  `.dbc` via [`cantools`](https://cantools.readthedocs.io/) (`bms_hil.io`).
+- **Reference BMS ECU** — SOC estimation, SOH/SOX reporting, OV/UV/OT/UT/OC +
+  isolation protection, thermal-runaway detection, latching faults, a two-step
+  precharge contactor state machine, passive cell balancing, and a small UDS
   diagnostic server (`bms_hil.ecu`). Swap it for real hardware transparently.
-- **Fault injection** — sensor bias, open-circuit, temperature and cell-imbalance
-  faults with timed activation windows (`bms_hil.faults`).
+- **Fault injection** — sensor bias, open-circuit, temperature, cell-imbalance,
+  low-isolation and SOH faults with timed activation windows (`bms_hil.faults`).
 - **Test framework** — assertion recorder, per-test isolated bench, runner, and
-  JUnit/HTML reporting (`bms_hil.testing`, `bms_hil.report`).
-- **Scenarios** — charge, discharge, SOC tracking, OV/UV/OT/OC protection, cell
-  balancing, and contactor control (`bms_hil.scenarios`).
+  JUnit/HTML reporting with an embedded matplotlib signal plot
+  (`bms_hil.testing`, `bms_hil.report`).
+- **Scenarios** — charge, discharge, SOC tracking, drive-cycle replay,
+  OV/UV/OT/OC protection, thermal runaway, isolation monitoring, cell balancing,
+  SOH/SOX reporting, precharge and contactor control (`bms_hil.scenarios`).
 
 ## Quick start
 
@@ -73,31 +78,46 @@ Key sections (see `config/hil_config.yaml`): `pack`, `cell`, `ecu`
 
 ### Running against real hardware
 
-1. `pip install python-can` and connect a supported CAN adapter.
-2. In your config set `can.backend: python-can` and the right
-   `python_can_interface` / `channel` (e.g. `socketcan` / `can0`).
+1. `pip install python-can cantools` and connect a supported CAN adapter.
+2. In your config set `can.backend: python-can`, the right
+   `python_can_interface` / `channel` (e.g. `socketcan` / `can0`), and
+   `can.dbc_path` pointing at your ECU's `.dbc` communication matrix.
 3. Wire the tester CAN to the ECU. The built-in ECU stub is disabled
    automatically; the same scenarios now exercise your real BMS ECU.
 
-> Adapt `bms_hil/io/signal_db.py` (or replace it with a `cantools` DBC loader)
-> and the DID/message IDs to match your ECU's communication matrix.
+> `config/bms.dbc` is a sample matching the built-in messages. When you supply
+> your own DBC, keep the message/signal names the scenarios reference (or adapt
+> the scenarios). Without a DBC the built-in `bms_hil/io/signal_db.py` is used.
+
+### Using a DBC in simulation
+
+```bash
+bms-hil -c /dev/stdin test <<'YAML'
+can: { dbc_path: config/bms.dbc }
+YAML
+# ...or simply set can.dbc_path in config/hil_config.yaml
+```
+
+The DBC path swaps the signal database for a `cantools`-backed one; the plant,
+ECU and every scenario run unchanged.
 
 ## Project layout
 
 ```
 src/bms_hil/
   core/       config, logging, fixed-step scheduler, HIL bench orchestrator
-  plant/      cell model + battery pack plant
-  io/         CAN bus (virtual + python-can), signal DB, UDS client
+  plant/      cell model (2-RC + thermal + SOH) + battery pack plant
+  io/         CAN bus (virtual + python-can), signal DB, DBC loader, UDS client
   ecu/        reference BMS ECU stub + tester-side interface
   faults/     fault-injection engine
   testing/    assertions, test case/context, runner
   scenarios/  concrete test scenarios + default suite
-  report/     data logger, JUnit + HTML report generators
+  report/     data logger, JUnit + HTML report generators, matplotlib plots
   cli.py      `bms-hil` command-line entry point
-config/       example YAML configs (sim + hardware)
+config/       example YAML configs (sim + hardware) and sample bms.dbc
 examples/     scripted usage example
 tests/        pytest unit + end-to-end tests
+.github/      CI workflow (pytest matrix + ruff + mypy)
 ```
 
 ## Development
@@ -105,7 +125,28 @@ tests/        pytest unit + end-to-end tests
 ```bash
 ./setup_env.sh --dev
 source .venv/bin/activate
-pytest                      # unit + scenario tests
+pytest                      # unit + scenario + DBC + UDS + plot tests
+ruff check src tests        # lint
+mypy                        # type-check
+```
+
+A `SessionStart` hook (`.claude/settings.json`) installs the package with dev
+extras automatically at the start of a Claude Code session so tests and linters
+are ready to run.
+
+## Optional dependencies
+
+| Extra        | Unlocks                                            |
+|--------------|----------------------------------------------------|
+| `hardware`   | `python-can` backend for real CAN adapters         |
+| `dbc`        | `cantools` DBC communication-matrix decoding       |
+| `config`     | `pyyaml` YAML config files (JSON works without it)  |
+| `analysis`   | `numpy` / `matplotlib` (embedded report plots)     |
+| `full`       | all of the above                                   |
+| `dev`        | test + lint + type-check tooling                   |
+
+```bash
+pip install -e ".[full]"    # everything
 ```
 
 ## License
