@@ -1,0 +1,278 @@
+{
+  "format_version": 1,
+  "name": "ADAS Demo",
+  "package": "AdasDemo",
+  "autosar_release": "R23-11",
+  "service_interfaces": [
+    {
+      "name": "RadarService",
+      "namespace": "adas",
+      "methods": [
+        {
+          "name": "Calibrate",
+          "fire_and_forget": false,
+          "arguments": [
+            {
+              "name": "azimuthOffset",
+              "type": "float",
+              "direction": "IN"
+            },
+            {
+              "name": "success",
+              "type": "boolean",
+              "direction": "OUT"
+            }
+          ]
+        },
+        {
+          "name": "Reset",
+          "fire_and_forget": true,
+          "arguments": []
+        }
+      ],
+      "events": [
+        {
+          "name": "ObjectList",
+          "type": "uint32"
+        }
+      ],
+      "fields": [
+        {
+          "name": "OperatingMode",
+          "type": "uint8",
+          "has_getter": true,
+          "has_setter": true,
+          "has_notifier": true
+        }
+      ]
+    },
+    {
+      "name": "BrakeService",
+      "namespace": "adas",
+      "methods": [
+        {
+          "name": "RequestBraking",
+          "fire_and_forget": false,
+          "arguments": [
+            {
+              "name": "decel",
+              "type": "float",
+              "direction": "IN"
+            },
+            {
+              "name": "accepted",
+              "type": "boolean",
+              "direction": "OUT"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "name": "BrakeStatus",
+          "type": "uint8"
+        }
+      ],
+      "fields": []
+    }
+  ],
+  "applications": [
+    {
+      "name": "RadarSensorApp",
+      "description": "Front radar sensor fusion component",
+      "ports": [
+        {
+          "name": "RadarProvider",
+          "direction": "PROVIDED",
+          "interface": "RadarService"
+        }
+      ]
+    },
+    {
+      "name": "BrakeControllerApp",
+      "description": "Automatic emergency braking controller",
+      "ports": [
+        {
+          "name": "RadarConsumer",
+          "direction": "REQUIRED",
+          "interface": "RadarService"
+        },
+        {
+          "name": "BrakeProvider",
+          "direction": "PROVIDED",
+          "interface": "BrakeService"
+        }
+      ]
+    }
+  ],
+  "executables": [
+    {
+      "name": "RadarSensorExe",
+      "root_component": "RadarSensorApp",
+      "version": "1.2.0"
+    },
+    {
+      "name": "BrakeControllerExe",
+      "root_component": "BrakeControllerApp",
+      "version": "1.0.0"
+    }
+  ],
+  "processes": [
+    {
+      "name": "RadarSensorProc",
+      "executable": "RadarSensorExe",
+      "scheduling_policy": "SCHED_FIFO",
+      "priority": 60,
+      "core_affinity": [
+        0
+      ],
+      "startup_states": [
+        "Running"
+      ]
+    },
+    {
+      "name": "BrakeControllerProc",
+      "executable": "BrakeControllerExe",
+      "scheduling_policy": "SCHED_FIFO",
+      "priority": 80,
+      "core_affinity": [
+        1
+      ],
+      "startup_states": [
+        "Running"
+      ]
+    }
+  ],
+  "machines": [
+    {
+      "name": "AdasEcu",
+      "machine_states": [
+        "Startup",
+        "Running",
+        "Shutdown"
+      ],
+      "functional_clusters": [
+        "EM",
+        "SM",
+        "CM",
+        "DM",
+        "PER",
+        "LOG"
+      ]
+    }
+  ],
+  "service_instances": [
+    {
+      "name": "RadarServiceInstance",
+      "service_interface": "RadarService",
+      "instance_id": 1,
+      "binding": "SOMEIP",
+      "role": "PROVIDED",
+      "udp_port": 30501,
+      "tcp_port": null,
+      "service_id": 4660
+    },
+    {
+      "name": "BrakeServiceInstance",
+      "service_interface": "BrakeService",
+      "instance_id": 1,
+      "binding": "SOMEIP",
+      "role": "PROVIDED",
+      "udp_port": 30502,
+      "tcp_port": null,
+      "service_id": 4661
+    }
+  ],
+  "bsw_modules": [
+    {
+      "name": "EM",
+      "vendor": "OpenAUTOSAR",
+      "description": "Execution Management functional cluster",
+      "containers": [
+        {
+          "name": "EmGeneral",
+          "parameters": [
+            {
+              "name": "EmDefaultSchedulingPolicy",
+              "type": "ENUM",
+              "value": "SCHED_OTHER"
+            },
+            {
+              "name": "EmWatchdogSupervisionEnabled",
+              "type": "BOOLEAN",
+              "value": true
+            },
+            {
+              "name": "EmStartupTimeoutMs",
+              "type": "INTEGER",
+              "value": 5000
+            }
+          ],
+          "sub_containers": []
+        }
+      ]
+    },
+    {
+      "name": "SM",
+      "vendor": "OpenAUTOSAR",
+      "description": "State Management functional cluster",
+      "containers": [
+        {
+          "name": "SmFunctionGroups",
+          "parameters": [],
+          "sub_containers": [
+            {
+              "name": "MachineState",
+              "parameters": [
+                {
+                  "name": "SmInitialState",
+                  "type": "STRING",
+                  "value": "Startup"
+                },
+                {
+                  "name": "SmStates",
+                  "type": "STRING",
+                  "value": "Startup,Running,Shutdown"
+                }
+              ],
+              "sub_containers": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "CM",
+      "vendor": "OpenAUTOSAR",
+      "description": "Communication Management functional cluster",
+      "containers": [
+        {
+          "name": "CmGeneral",
+          "parameters": [
+            {
+              "name": "CmDefaultBinding",
+              "type": "ENUM",
+              "value": "SOMEIP"
+            },
+            {
+              "name": "CmServiceDiscoveryEnabled",
+              "type": "BOOLEAN",
+              "value": true
+            },
+            {
+              "name": "CmSdMulticastAddress",
+              "type": "STRING",
+              "value": "239.192.0.1"
+            },
+            {
+              "name": "CmSdPort",
+              "type": "INTEGER",
+              "value": 30490
+            }
+          ],
+          "sub_containers": []
+        }
+      ]
+    }
+  ]
+}

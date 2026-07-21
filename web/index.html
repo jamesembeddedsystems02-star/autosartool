@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>autosartool — Adaptive AUTOSAR Configuration</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">◆</span>
+      <span class="title">autosartool</span>
+      <span class="subtitle">Adaptive AUTOSAR &amp; BSW Configuration</span>
+    </div>
+    <div class="toolbar">
+      <button id="btn-example" class="btn ghost" title="Load the built-in ADAS demo">Load Example</button>
+      <button id="btn-save" class="btn" title="Persist the project">Save</button>
+      <button id="btn-validate" class="btn primary" title="Run validation rules">Validate</button>
+      <button id="btn-generate" class="btn" title="Generate C++/manifests/CMake">Generate</button>
+      <button id="btn-arxml" class="btn" title="Export AUTOSAR ARXML">Export ARXML</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <nav class="sidebar" id="sidebar"><!-- category tree injected here --></nav>
+    <section class="editor" id="editor">
+      <div class="empty-state">
+        <h2>Select an element</h2>
+        <p>Pick a category on the left, or load the example project to explore a complete ADAS configuration.</p>
+      </div>
+    </section>
+    <aside class="output" id="output" hidden>
+      <div class="output-head">
+        <span id="output-title">Output</span>
+        <button id="output-close" class="icon-btn" title="Close">✕</button>
+      </div>
+      <div class="output-body" id="output-body"></div>
+    </aside>
+  </main>
+
+  <div class="statusbar" id="statusbar">
+    <span id="status-project">No project</span>
+    <span id="status-msg"></span>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
