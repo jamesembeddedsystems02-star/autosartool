@@ -10,6 +10,27 @@ built-in virtual CAN bus and a reference BMS ECU stand in for the bench — so y
 can develop and run tests anywhere, then point the same tests at a real ECU by
 switching one config line.
 
+## ⚡ Fastest start — one file, zero install
+
+Don't want to install anything? Just run the single-file edition with plain
+Python (3.8+, standard library only):
+
+```bash
+python run_bms_hil.py            # interactive menu
+python run_bms_hil.py selftest   # quick health check
+python run_bms_hil.py demo       # charge → discharge → fault, writes a trace
+python run_bms_hil.py test       # 16-scenario suite + reports/report.html
+```
+
+`run_bms_hil.py` is fully self-contained: pack simulation, reference BMS ECU
+(protection, precharge contactor, balancing, SOH/SOX), the 16-test suite, and an
+HTML report — all in one copy-and-run file. Tune the pack/ECU by editing the
+`CONFIG` dict at the top. `matplotlib`, if installed, adds a PNG trace plot.
+
+The rest of this README describes the full **modular package** (`src/bms_hil`),
+which adds the CAN transport, DBC/`cantools` decoding, UDS diagnostics, and a
+`pip`-installable `bms-hil` command.
+
 ```
    plant (BatteryPack)  ── SIM_CellVoltages ──▶  BMS ECU (device under test)
              ▲                                          │

@@ -6,8 +6,8 @@ with ``PYTHONPATH=src python examples/run_demo.py``.
 
 from __future__ import annotations
 
-from bms_hil.core.config import Config
 from bms_hil.core.bench import HilBench
+from bms_hil.core.config import Config
 from bms_hil.core.logging_setup import setup_logging
 from bms_hil.faults import CellVoltageOffsetFault, FaultInjector
 
