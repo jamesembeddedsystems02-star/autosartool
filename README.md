@@ -1,5 +1,23 @@
 # BMS HIL — Battery Management ECU Hardware-in-the-Loop Test Tool
 
+## ▶ How to run (pick one)
+
+You need **Python 3** installed. Nothing else. From this folder:
+
+| Your system | Command |
+|-------------|---------|
+| macOS / Linux | `./run.sh` |
+| Windows | double-click **`run.bat`** (or type `run.bat`) |
+| Anywhere | `python run_bms_hil.py` |
+
+That opens a menu — press **1** for a quick self-test, **2** for a demo, **3**
+to run the full test suite. Prefer a direct command? Add `selftest`, `demo`, or
+`test`, e.g. `./run.sh test` or `python run_bms_hil.py test`.
+
+Results (an HTML report) land in the `reports/` folder.
+
+---
+
 A modular **Hardware-in-the-Loop (HIL)** test framework in Python for validating
 **Battery Management System (BMS) ECUs**. It simulates a battery pack, talks to
 the ECU over CAN, injects faults, and runs an automated test suite that produces
