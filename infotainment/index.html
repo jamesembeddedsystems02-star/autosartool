@@ -123,6 +123,18 @@ button{font-family:inherit; color:inherit; cursor:pointer; border:0; background:
 .map .eta .sub{font-size:11px;color:var(--muted);margin-top:1px}
 .map .dest{align-self:flex-start;background:rgba(75,155,255,.16);border:1px solid rgba(75,155,255,.45);color:#CFE3FF;
   border-radius:12px;padding:8px 12px;font-size:12px;display:flex;gap:8px;align-items:center}
+/* Google Maps live layer — sits under the HUD overlays, shown once the API loads */
+.gmap{position:absolute;inset:0;display:none;background:#0B1017}
+.gm-on .mapcanvas{display:none!important}
+.gm-on .gmap{display:block}
+.map .over,.searchbar,.turnstrip{z-index:3}
+.map .gmap,.bigmap .gmap{z-index:1}
+.gm-style .gm-style-iw,.gmnoprint{filter:none}
+.livebadge{align-self:flex-end;display:none;align-items:center;gap:7px;background:rgba(8,11,17,.72);
+  backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:10.5px;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--good)}
+.gm-on .livebadge{display:inline-flex}
+.livebadge .dotpulse{background:var(--good)}
 .nowcard{display:flex;flex-direction:column}
 .nowcard .art{height:74px;border-radius:14px;background:
   conic-gradient(from 210deg,#FF7AB6,#7A5CFF,#34E0D4,#FFC24B,#FF7AB6);position:relative;overflow:hidden;flex:none}
@@ -360,16 +372,18 @@ button{font-family:inherit; color:inherit; cursor:pointer; border:0; background:
       <!-- ===== HOME ===== -->
       <div class="view on" id="home">
         <div class="grid">
-          <div class="map" data-view="nav" id="homemap">
+          <div class="map" id="homemap">
             <canvas class="mapcanvas" width="700" height="440" style="width:100%;height:100%;display:block"></canvas>
+            <div class="gmap" data-gmap="home"></div>
             <div class="over">
               <div class="eta">
-                <div class="big">18 min · <span class="tnum">7.4</span> mi</div>
-                <div class="sub">Arrive 4:52 PM · via I-280 N</div>
+                <div class="big"><span id="h-eta">34 min</span> · <span class="tnum" id="h-dist">18.2</span> mi</div>
+                <div class="sub" id="h-sub">Arrive 5:19 PM · via I-278 W</div>
               </div>
+              <div class="livebadge"><span class="dotpulse"></span>Live traffic</div>
               <div class="dest">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.5 7-12a7 7 0 10-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2"/></svg>
-                Supercharger — Palo Alto
+                Times Square — New York
               </div>
             </div>
           </div>
@@ -399,7 +413,7 @@ button{font-family:inherit; color:inherit; cursor:pointer; border:0; background:
           </div>
 
           <div class="tiles">
-            <button class="tile" data-view="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21s7-6.5 7-12a7 7 0 10-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.4"/></svg><span class="tn">Navigate</span><span class="ts">Palo Alto · 18 min</span></button>
+            <button class="tile" data-view="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21s7-6.5 7-12a7 7 0 10-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.4"/></svg><span class="tn">Navigate</span><span class="ts">Times Square · 34 min</span></button>
             <button class="tile" data-view="veh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 2L4.5 13.5H11L11 22 19.5 10.5H13z"/></svg><span class="tn">Charging</span><span class="ts">Not plugged in</span></button>
             <button class="tile warn" data-view="veh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="14" r="6"/><path d="M12 11v3l2 1M9 3h6"/></svg><span class="tn">Tire pressure</span><span class="ts">Rear-left 29 psi</span></button>
             <button class="tile" data-view="veh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l7 4v6c0 5-3 8-7 10-4-2-7-5-7-10V6z"/><path d="M9.5 12l2 2 3.5-4"/></svg><span class="tn">Software</span><span class="ts">Update available</span></button>
@@ -412,24 +426,27 @@ button{font-family:inherit; color:inherit; cursor:pointer; border:0; background:
         <div class="wrap">
           <div class="bigmap">
             <canvas class="mapcanvas" width="720" height="560" style="width:100%;height:100%;display:block"></canvas>
+            <div class="gmap" data-gmap="nav"></div>
             <div class="searchbar">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
-              <span>Search for a place or address…</span>
+              <span id="nav-search">Times Square, New York, NY</span>
             </div>
             <div class="turnstrip">
               <div class="arw"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 20V7M6 11l6-6 6 6"/></svg></div>
               <div>
-                <div class="big"><span class="tnum">0.4</span> mi</div>
-                <div class="sub">Continue onto I-280 North</div>
+                <div class="big"><span class="tnum" id="turn-dist">0.6</span> mi</div>
+                <div class="sub" id="turn-instr">Merge onto the Van Wyck Expwy N</div>
               </div>
             </div>
           </div>
           <div class="card pad route-panel">
-            <div class="h"><span class="lbl">Route</span><span class="chip">18 min · 7.4 mi</span></div>
-            <div class="stop"><div class="pin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/></svg></div><div><div class="sn">Current location</div><div class="ss">Mountain View, CA</div></div><div class="dist">now</div></div>
-            <div class="stop"><div class="pin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V7M6 11l6-6 6 6"/></svg></div><div><div class="sn">I-280 North</div><div class="ss">Continue for 5.1 mi</div></div><div class="dist">0.4 mi</div></div>
-            <div class="stop"><div class="pin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></div><div><div class="sn">Exit 20 — Sand Hill Rd</div><div class="ss">Keep right</div></div><div class="dist">5.5 mi</div></div>
-            <div class="stop"><div class="pin" style="color:var(--good)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.5 7-12a7 7 0 10-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2"/></svg></div><div><div class="sn">Supercharger — Palo Alto</div><div class="ss">16 stalls · 8 available</div></div><div class="dist">7.4 mi</div></div>
+            <div class="h"><span class="lbl">Route</span><span class="chip" id="route-chip">34 min · 18.2 mi</span></div>
+            <div id="route-steps">
+              <div class="stop"><div class="pin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/></svg></div><div><div class="sn">Current location</div><div class="ss">JFK International Airport, Queens</div></div><div class="dist">now</div></div>
+              <div class="stop"><div class="pin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V7M6 11l6-6 6 6"/></svg></div><div><div class="sn">Van Wyck Expwy N</div><div class="ss">I-678 · continue 4.3 mi</div></div><div class="dist">0.6 mi</div></div>
+              <div class="stop"><div class="pin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></div><div><div class="sn">Midtown Tunnel</div><div class="ss">Take I-495 W into Manhattan</div></div><div class="dist">9.7 mi</div></div>
+              <div class="stop"><div class="pin" style="color:var(--good)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.5 7-12a7 7 0 10-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2"/></svg></div><div><div class="sn">Times Square — New York</div><div class="ss">Broadway &amp; W 45th St</div></div><div class="dist">18.2 mi</div></div>
+            </div>
           </div>
         </div>
       </div>
@@ -790,6 +807,130 @@ button{font-family:inherit; color:inherit; cursor:pointer; border:0; background:
     draw();
     if(!reduce){ (function loop(){ off=(off+0.8)%22; draw(); requestAnimationFrame(loop); })(); }
   }
+
+  /* ============================================================
+     REAL-TIME GOOGLE MAPS  —  destination: New York (Times Square)
+     ------------------------------------------------------------
+     Needs a Google Maps JavaScript API key. Provide one of:
+       1. Paste it into GMAPS_API_KEY below, OR
+       2. open the page with  ?gmapskey=YOUR_KEY  in the URL, OR
+       3. run  localStorage.setItem('sdv_gmaps_key','YOUR_KEY')  once.
+     Get a key: https://console.cloud.google.com/  (enable "Maps
+     JavaScript API" + "Directions API"). Without a key — or when the
+     script is blocked, e.g. inside a strict CSP sandbox — the canvas
+     map above stays as the fallback. Live traffic + real-time ETA
+     come from the Directions API with departureTime = now.
+     ============================================================ */
+  var GMAPS_API_KEY = "";            // <-- paste your key here (optional)
+
+  // New York route: JFK Airport  ->  Times Square
+  var ORIGIN = {lat:40.6413, lng:-73.7781};   // JFK International Airport
+  var DEST   = {lat:40.7580, lng:-73.9855};   // Times Square, New York
+
+  function resolveKey(){
+    try{
+      var q=new URLSearchParams(location.search).get("gmapskey")||new URLSearchParams(location.search).get("key");
+      if(q) return q;
+      var ls=localStorage.getItem("sdv_gmaps_key"); if(ls) return ls;
+    }catch(e){}
+    return (window.SDV_GMAPS_KEY||GMAPS_API_KEY||"").trim();
+  }
+
+  // Dark map styling to match the cockpit theme.
+  var DARK_STYLE=[
+    {elementType:"geometry",stylers:[{color:"#0d131c"}]},
+    {elementType:"labels.text.stroke",stylers:[{color:"#0d131c"}]},
+    {elementType:"labels.text.fill",stylers:[{color:"#7A8798"}]},
+    {featureType:"poi",stylers:[{visibility:"off"}]},
+    {featureType:"transit",stylers:[{visibility:"off"}]},
+    {featureType:"administrative",elementType:"geometry",stylers:[{color:"#2A3646"}]},
+    {featureType:"water",elementType:"geometry",stylers:[{color:"#0a2230"}]},
+    {featureType:"water",elementType:"labels.text.fill",stylers:[{color:"#33566a"}]},
+    {featureType:"landscape",elementType:"geometry",stylers:[{color:"#111823"}]},
+    {featureType:"road",elementType:"geometry",stylers:[{color:"#1b2634"}]},
+    {featureType:"road",elementType:"geometry.stroke",stylers:[{color:"#243244"}]},
+    {featureType:"road.highway",elementType:"geometry",stylers:[{color:"#2b3a4d"}]},
+    {featureType:"road",elementType:"labels.text.fill",stylers:[{color:"#8593a6"}]}
+  ];
+
+  function mkMarker(gmap,pos,fill){
+    return new google.maps.Marker({map:gmap,position:pos,icon:{
+      path:google.maps.SymbolPath.CIRCLE,scale:7,fillColor:fill,fillOpacity:1,strokeColor:"#06110F",strokeWeight:2}});
+  }
+
+  window.__sdvInitGMaps = function(){
+    var els = document.querySelectorAll(".gmap[data-gmap]");
+    if(!els.length || !window.google || !google.maps) return;
+    var renderers=[];
+    els.forEach(function(el){
+      var gmap=new google.maps.Map(el,{
+        center:DEST, zoom:12, disableDefaultUI:true, gestureHandling:"greedy",
+        backgroundColor:"#0d131c", styles:DARK_STYLE
+      });
+      new google.maps.TrafficLayer().setMap(gmap);          // real-time congestion
+      var rndr=new google.maps.DirectionsRenderer({map:gmap,suppressMarkers:true,preserveViewport:false,
+        polylineOptions:{strokeColor:"#4B9BFF",strokeWeight:6,strokeOpacity:.95}});
+      mkMarker(gmap,ORIGIN,"#34E0D4");                        // the car
+      mkMarker(gmap,DEST,"#35D67A");                          // destination
+      el.closest(".map,.bigmap").classList.add("gm-on");
+      renderers.push(rndr);
+    });
+
+    var ds=new google.maps.DirectionsService();
+    ds.route({
+      origin:ORIGIN, destination:DEST,
+      travelMode:google.maps.TravelMode.DRIVING,
+      unitSystem:google.maps.UnitSystem.IMPERIAL,
+      provideRouteAlternatives:false,
+      drivingOptions:{departureTime:new Date(), trafficModel:google.maps.TrafficModel.BEST_GUESS}
+    }, function(res,status){
+      if(status!=="OK"||!res.routes[0]) return;
+      renderers.forEach(function(r){ r.setDirections(res); });
+      populate(res.routes[0]);
+    });
+  };
+
+  function setText(id,txt){ var e=document.getElementById(id); if(e) e.textContent=txt; }
+
+  function populate(route){
+    var leg=route.legs[0];
+    var durTxt=(leg.duration_in_traffic||leg.duration).text;     // e.g. "41 mins"
+    var durSec=(leg.duration_in_traffic||leg.duration).value;
+    var distTxt=leg.distance.text;                               // e.g. "18.2 mi"
+    var distNum=distTxt.replace(/[^\d.]/g,"");
+    var arrive=new Date(Date.now()+durSec*1000)
+      .toLocaleTimeString(undefined,{hour:"numeric",minute:"2-digit"});
+    var road=(leg.steps[0]&&leg.steps[0].instructions||"").replace(/<[^>]+>/g,"") || "your route";
+    // Home HUD
+    setText("h-eta",durTxt); setText("h-dist",distNum);
+    setText("h-sub","Arrive "+arrive+" · live traffic");
+    // Nav HUD
+    setText("route-chip",durTxt+" · "+distTxt);
+    setText("turn-dist",(leg.steps[0]?(leg.steps[0].distance.text.replace(/[^\d.]/g,"")):distNum));
+    setText("turn-instr",road);
+    // Rebuild step list from the live route
+    var box=document.getElementById("route-steps");
+    if(box){
+      var html='<div class="stop"><div class="pin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/></svg></div><div><div class="sn">Current location</div><div class="ss">'+esc(leg.start_address)+'</div></div><div class="dist">now</div></div>';
+      leg.steps.slice(0,3).forEach(function(s){
+        html+='<div class="stop"><div class="pin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></div><div><div class="sn">'+esc(s.instructions.replace(/<[^>]+>/g,""))+'</div><div class="ss">'+esc(s.distance.text)+'</div></div><div class="dist">'+esc(s.distance.text)+'</div></div>';
+      });
+      html+='<div class="stop"><div class="pin" style="color:var(--good)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.5 7-12a7 7 0 10-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2"/></svg></div><div><div class="sn">Times Square — New York</div><div class="ss">'+esc(leg.end_address)+'</div></div><div class="dist">'+esc(distTxt)+'</div></div>';
+      box.innerHTML=html;
+    }
+  }
+  function esc(s){var d=document.createElement("div");d.textContent=s;return d.innerHTML;}
+
+  (function loadGMaps(){
+    var key=resolveKey();
+    if(!key) return;                       // no key -> keep the canvas fallback
+    if(window.google&&window.google.maps){ window.__sdvInitGMaps(); return; }
+    var s=document.createElement("script");
+    s.src="https://maps.googleapis.com/maps/api/js?key="+encodeURIComponent(key)+"&libraries=&callback=__sdvInitGMaps";
+    s.async=true; s.defer=true;
+    s.onerror=function(){ /* blocked or bad key: canvas map stays */ };
+    document.head.appendChild(s);
+  })();
 })();
 </script>
 </body>

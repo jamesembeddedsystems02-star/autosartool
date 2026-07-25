@@ -25,7 +25,7 @@ HMIs.
 | App | What it does |
 |-----|--------------|
 | **Home** | Live map preview, now-playing widget, EV state-of-charge ring + range, quick tiles |
-| **Maps** | Animated route with turn-by-turn strip, search bar, and a step list to a Supercharger |
+| **Maps** | Real-time Google Maps (with an API key) or an animated canvas fallback — turn-by-turn strip, search bar, and a live step list routing to **Times Square, New York** |
 | **Media** | Album art with animated EQ, transport controls, sources (Bluetooth / Radio / USB), and a playable queue |
 | **Phone** | Recent-calls list (incoming / outgoing / missed) and a working dial pad |
 | **Car** | Vehicle top-view with door status, drive-mode selector, energy & range, per-wheel TPMS, and an **over-the-air software update** you can install |
@@ -42,6 +42,37 @@ HMIs.
   per-ECU status (VCU / IVI / ADAS / BMS) progress to completion.
 - Ambient telemetry: the live clock, a wandering speed readout, and a slowly
   depleting battery/range keep the screen "alive."
+
+## Real-time Google Maps (destination: New York)
+
+The **Home** and **Maps** screens can render a live Google map — dark-themed
+to match the cockpit — with a **real-time traffic layer** and a route to
+**Times Square, New York** (origin: JFK Airport). The live Directions result
+drives the on-screen ETA, distance, arrival time and turn list
+(`departureTime = now`, so the ETA reflects current traffic).
+
+This needs a **Google Maps JavaScript API key** (enable *Maps JavaScript API*
++ *Directions API* at <https://console.cloud.google.com/>). Provide it any
+one of these ways — no rebuild required:
+
+```bash
+# 1. URL parameter (easiest for a quick try)
+open "infotainment/index.html?gmapskey=YOUR_KEY"
+
+# 2. Save it once in the browser, then just open the file
+localStorage.setItem('sdv_gmaps_key','YOUR_KEY')
+
+# 3. Hardcode it — set GMAPS_API_KEY at the top of the <script> in index.html
+```
+
+Change the city by editing `ORIGIN` / `DEST` (lat/lng) in the script.
+
+> **Two important notes.** (1) The Google Maps script loads from
+> `maps.googleapis.com`, so it only works when the file is opened locally or
+> self-hosted — a **sandboxed preview with a strict Content-Security-Policy
+> (e.g. the shared web artifact) blocks it**, and the built-in canvas map is
+> shown instead. (2) Without a key, the canvas map (already themed to the
+> New York route) is the fallback everywhere. No key is ever committed.
 
 ## SDV / AUTOSAR angle
 
