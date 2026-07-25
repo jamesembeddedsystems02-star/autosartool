@@ -1,5 +1,13 @@
 # BMS HIL — Battery Management ECU Hardware-in-the-Loop Test Tool
 
+> **New:** [`infotainment/`](infotainment/) contains **SDV Cockpit**, a
+> software-defined-vehicle infotainment HMI — an in-car center-console
+> touchscreen (maps, media, climate, phone, EV status, and over-the-air
+> software) in a single self-contained HTML file. Just open
+> `infotainment/index.html` in a browser — no build, no install. See
+> [`infotainment/README.md`](infotainment/README.md).
+
+
 ## ▶ How to run (pick one)
 
 You need **Python 3** installed. Nothing else. From this folder:

@@ -1,0 +1,796 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>SDV Cockpit — In-Car Infotainment HMI</title>
+<style>
+/* ============================================================
+   SDV Cockpit — Software-Defined Vehicle Infotainment HMI
+   Committed dark single-theme (an in-car display is never light-mode).
+   ============================================================ */
+:root{
+  --ground:#080B11; --ground-2:#0C1119;
+  --panel:#131A24; --panel-2:#1B2431; --panel-3:#232E3D;
+  --line:#2A3646; --line-soft:#1E2836;
+  --ink:#EAF1F8; --muted:#7A8798; --muted-2:#586475;
+  --accent:#34E0D4; --accent-ink:#062B29;
+  --nav:#4B9BFF; --good:#35D67A; --warn:#FFB020; --energy:#FFC24B; --crit:#FF5C5C;
+  --font:"SF Pro Display",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,system-ui,sans-serif;
+  --shadow:0 18px 50px -18px rgba(0,0,0,.75);
+  --r:22px; --r-sm:14px;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; font-family:var(--font); color:var(--ink);
+  background:
+    radial-gradient(1200px 700px at 78% -12%, rgba(52,224,212,.10), transparent 60%),
+    radial-gradient(900px 620px at 8% 118%, rgba(75,155,255,.10), transparent 60%),
+    #04060A;
+  display:flex; align-items:center; justify-content:center;
+  min-height:100dvh; padding:min(4vmin,34px);
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+}
+button{font-family:inherit; color:inherit; cursor:pointer; border:0; background:none}
+.tnum{font-variant-numeric:tabular-nums; letter-spacing:.01em}
+.lbl{font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted)}
+
+/* ---- The physical display: bezel + glass ---- */
+.bezel{
+  width:min(1180px,100%); aspect-ratio:16/10; position:relative;
+  border-radius:34px; padding:14px;
+  background:linear-gradient(150deg,#20262F,#0B0E13 55%,#171B21);
+  box-shadow:
+    var(--shadow),
+    inset 0 1px 0 rgba(255,255,255,.06),
+    inset 0 0 0 1px rgba(0,0,0,.6);
+}
+.bezel::after{ /* screen glass sheen */
+  content:""; position:absolute; inset:14px; border-radius:24px; pointer-events:none; z-index:6;
+  background:linear-gradient(115deg,rgba(255,255,255,.05),transparent 22%,transparent 78%,rgba(255,255,255,.03));
+  mix-blend-mode:screen;
+}
+.screen{
+  position:absolute; inset:14px; border-radius:24px; overflow:hidden;
+  background:radial-gradient(140% 120% at 50% -10%, var(--ground-2), var(--ground) 60%);
+  display:grid; grid-template-columns:82px 1fr; grid-template-rows:52px 1fr auto;
+  grid-template-areas:"dock status" "dock canvas" "dock climate";
+}
+
+/* ---- Left app dock ---- */
+.dock{grid-area:dock; background:linear-gradient(180deg,rgba(255,255,255,.02),transparent);
+  border-right:1px solid var(--line-soft); display:flex; flex-direction:column; align-items:center;
+  padding:12px 0 14px; gap:4px}
+.dock .brand{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;margin-bottom:8px;
+  background:linear-gradient(135deg,var(--accent),var(--nav)); color:#04120F; font-weight:800; box-shadow:0 6px 18px -6px var(--accent)}
+.dock .spring{margin-top:auto}
+.napp{width:58px;height:56px;border-radius:16px;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:4px;color:var(--muted);transition:.18s;position:relative}
+.napp svg{width:22px;height:22px}
+.napp small{font-size:8.5px;letter-spacing:.06em;text-transform:uppercase}
+.napp:hover{color:var(--ink);background:rgba(255,255,255,.04)}
+.napp.on{color:var(--accent);background:rgba(52,224,212,.10)}
+.napp.on::before{content:"";position:absolute;left:-1px;top:14px;bottom:14px;width:3px;border-radius:3px;background:var(--accent);box-shadow:0 0 12px var(--accent)}
+
+/* ---- Status strip ---- */
+.status{grid-area:status;display:flex;align-items:center;gap:14px;padding:0 20px;
+  border-bottom:1px solid var(--line-soft);background:linear-gradient(180deg,rgba(255,255,255,.02),transparent)}
+.gear{display:flex;align-items:center;gap:2px}
+.gear b{width:22px;height:24px;border-radius:6px;display:grid;place-items:center;font-size:12px;font-weight:700;color:var(--muted-2)}
+.gear b.on{color:var(--ground);background:var(--accent)}
+.gear b.on.d{background:var(--good);color:#04140A}
+.status .mini-speed{margin-left:2px;color:var(--muted);font-size:12px}
+.status .mini-speed b{color:var(--ink);font-size:16px;font-weight:600}
+.clock{margin:0 auto;text-align:center;line-height:1}
+.clock .t{font-size:19px;font-weight:600}
+.clock .d{font-size:10px;color:var(--muted);letter-spacing:.08em;margin-top:2px}
+.status .right{display:flex;align-items:center;gap:14px}
+.status .otemp{font-size:14px;color:var(--muted)}
+.status .otemp b{color:var(--ink);font-weight:600}
+.icns{display:flex;align-items:center;gap:11px;color:var(--muted)}
+.icns svg{width:17px;height:17px;display:block}
+.icns .lte{font-size:9px;font-weight:700;letter-spacing:.05em}
+.prof{display:flex;align-items:center;gap:8px;padding-left:12px;border-left:1px solid var(--line)}
+.avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#5A6B85,#2C3A52);
+  display:grid;place-items:center;font-size:12px;font-weight:700;color:#DDE7F5}
+.prof small{font-size:11px;color:var(--muted)}
+
+/* ---- Canvas ---- */
+.canvas{grid-area:canvas;position:relative;overflow:hidden}
+.view{position:absolute;inset:0;padding:18px;display:none;animation:vin .32s ease}
+.view.on{display:block}
+@keyframes vin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* generic cards */
+.card{background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--line-soft);
+  border-radius:var(--r);position:relative}
+.pad{padding:16px}
+.h{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.h .lbl{margin:0}
+.chip{font-size:11px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted);display:inline-flex;gap:6px;align-items:center}
+.chip.ok{color:var(--good);border-color:rgba(53,214,122,.4);background:rgba(53,214,122,.08)}
+.dotpulse{width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 0 0 rgba(53,214,122,.6);animation:pulse 2s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(53,214,122,.5)}70%{box-shadow:0 0 0 7px rgba(53,214,122,0)}100%{box-shadow:0 0 0 0 rgba(53,214,122,0)}}
+
+/* ===== HOME ===== */
+#home .grid{display:grid;grid-template-columns:1.55fr 1fr;grid-template-rows:1fr auto;gap:14px;height:100%}
+.map{grid-row:1/3;border-radius:var(--r);overflow:hidden;position:relative;border:1px solid var(--line-soft);cursor:pointer}
+.map .over{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;padding:14px}
+.map .eta{align-self:flex-start;background:rgba(8,11,17,.72);backdrop-filter:blur(8px);border:1px solid var(--line);
+  border-radius:14px;padding:10px 13px}
+.map .eta .big{font-size:17px;font-weight:600}
+.map .eta .sub{font-size:11px;color:var(--muted);margin-top:1px}
+.map .dest{align-self:flex-start;background:rgba(75,155,255,.16);border:1px solid rgba(75,155,255,.45);color:#CFE3FF;
+  border-radius:12px;padding:8px 12px;font-size:12px;display:flex;gap:8px;align-items:center}
+.nowcard{display:flex;flex-direction:column}
+.nowcard .art{height:74px;border-radius:14px;background:
+  conic-gradient(from 210deg,#FF7AB6,#7A5CFF,#34E0D4,#FFC24B,#FF7AB6);position:relative;overflow:hidden;flex:none}
+.nowcard .art::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 30% 25%,rgba(255,255,255,.32),transparent 55%)}
+.nowcard .meta{margin-top:10px}
+.nowcard .ttl{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nowcard .art-artist{font-size:11.5px;color:var(--muted);margin-top:1px}
+.mini-ctrl{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:10px;color:var(--ink)}
+.mini-ctrl button svg{width:20px;height:20px}
+.mini-ctrl .play{width:40px;height:40px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center}
+.mini-ctrl .play svg{width:18px;height:18px}
+.evsum{display:flex;flex-direction:column;gap:12px}
+.evtop{display:flex;align-items:center;gap:14px}
+.ring{--p:72;width:78px;height:78px;border-radius:50%;flex:none;display:grid;place-items:center;
+  background:conic-gradient(var(--accent) calc(var(--p)*1%),var(--line) 0);position:relative}
+.ring::before{content:"";position:absolute;inset:7px;border-radius:50%;background:var(--panel-2)}
+.ring b{position:relative;font-size:19px;font-weight:600}
+.ring b i{font-size:10px;color:var(--muted);font-style:normal;font-weight:500}
+.evtop .rng .big{font-size:26px;font-weight:600}
+.evtop .rng .big i{font-size:13px;color:var(--muted);font-style:normal}
+.evtop .rng .sub{font-size:11px;color:var(--muted);margin-top:2px}
+.tiles{grid-column:1/3;display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.tile{background:var(--panel);border:1px solid var(--line-soft);border-radius:var(--r-sm);padding:13px;
+  display:flex;flex-direction:column;gap:8px;transition:.16s;text-align:left}
+.tile:hover{border-color:var(--line);transform:translateY(-2px)}
+.tile svg{width:20px;height:20px;color:var(--accent)}
+.tile .tn{font-size:12.5px;font-weight:600}
+.tile .ts{font-size:10.5px;color:var(--muted)}
+.tile.warn svg{color:var(--warn)} .tile.warn .ts{color:var(--warn)}
+
+/* ===== NAV ===== */
+#nav .wrap{display:grid;grid-template-columns:1fr 320px;gap:14px;height:100%}
+.bigmap{border-radius:var(--r);overflow:hidden;position:relative;border:1px solid var(--line-soft)}
+.searchbar{position:absolute;top:14px;left:14px;right:14px;display:flex;gap:10px;align-items:center;
+  background:rgba(8,11,17,.72);backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:14px;padding:11px 14px}
+.searchbar svg{width:16px;height:16px;color:var(--muted)}
+.searchbar span{font-size:13px;color:var(--muted)}
+.turnstrip{position:absolute;left:14px;bottom:14px;background:rgba(75,155,255,.16);border:1px solid rgba(75,155,255,.45);
+  border-radius:16px;padding:12px 16px;display:flex;gap:14px;align-items:center;backdrop-filter:blur(8px)}
+.turnstrip .arw{width:34px;height:34px;border-radius:10px;background:var(--nav);display:grid;place-items:center;color:#04101F}
+.turnstrip .arw svg{width:20px;height:20px}
+.turnstrip .big{font-size:18px;font-weight:600}
+.turnstrip .sub{font-size:11.5px;color:#AFC7EA}
+.route-panel{display:flex;flex-direction:column;gap:12px}
+.stop{display:flex;gap:12px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--line-soft)}
+.stop:last-child{border-bottom:0}
+.stop .pin{width:26px;height:26px;border-radius:8px;background:var(--panel-3);display:grid;place-items:center;color:var(--nav);flex:none}
+.stop .pin svg{width:15px;height:15px}
+.stop .sn{font-size:13px;font-weight:600}
+.stop .ss{font-size:11px;color:var(--muted);margin-top:2px}
+.stop .dist{margin-left:auto;font-size:12px;color:var(--muted);white-space:nowrap}
+
+/* ===== MEDIA ===== */
+#media .wrap{display:grid;grid-template-columns:300px 1fr;gap:16px;height:100%}
+.player{display:flex;flex-direction:column;gap:16px}
+.bigart{aspect-ratio:1;border-radius:var(--r);position:relative;overflow:hidden;
+  background:conic-gradient(from 200deg,#FF7AB6,#7A5CFF,#34E0D4,#FFC24B,#FF7AB6)}
+.bigart::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 32% 22%,rgba(255,255,255,.35),transparent 55%)}
+.bigart .eq{position:absolute;left:0;right:0;bottom:0;height:40px;display:flex;align-items:flex-end;gap:3px;padding:0 14px;opacity:.9}
+.bigart .eq i{flex:1;background:rgba(255,255,255,.75);border-radius:2px 2px 0 0;height:20%;animation:eq 1.1s ease-in-out infinite}
+@keyframes eq{0%,100%{height:18%}50%{height:85%}}
+.trk .tt{font-size:20px;font-weight:600}
+.trk .ta{font-size:13px;color:var(--muted);margin-top:2px}
+.scrub{margin-top:6px}
+.bar{height:5px;border-radius:5px;background:var(--line);position:relative;overflow:hidden}
+.bar>i{position:absolute;inset:0 auto 0 0;width:38%;background:var(--accent);border-radius:5px}
+.times{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);margin-top:6px}
+.ctrl{display:flex;align-items:center;justify-content:space-between}
+.ctrl button svg{width:24px;height:24px}
+.ctrl .play{width:56px;height:56px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center}
+.ctrl .play svg{width:24px;height:24px}
+.ctrl .sm{color:var(--muted)} .ctrl .sm.on{color:var(--accent)}
+.sources{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.src{padding:8px 14px;border-radius:999px;border:1px solid var(--line);font-size:12px;color:var(--muted);display:flex;gap:7px;align-items:center}
+.src svg{width:14px;height:14px}
+.src.on{color:var(--accent-ink);background:var(--accent);border-color:var(--accent)}
+.queue{overflow:auto}
+.qrow{display:flex;align-items:center;gap:12px;padding:11px 8px;border-radius:12px;transition:.14s}
+.qrow:hover{background:rgba(255,255,255,.03)}
+.qrow.on{background:rgba(52,224,212,.08)}
+.qrow .qart{width:38px;height:38px;border-radius:9px;flex:none;background:linear-gradient(135deg,#3A4A63,#222E40)}
+.qrow.on .qart{background:linear-gradient(135deg,var(--accent),var(--nav))}
+.qrow .qn{font-size:13px;font-weight:600} .qrow.on .qn{color:var(--accent)}
+.qrow .qa{font-size:11px;color:var(--muted)}
+.qrow .qd{margin-left:auto;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* ===== VEHICLE (EV + SDV/OTA) ===== */
+#veh .grid{display:grid;grid-template-columns:1.2fr 1fr 1fr;grid-template-rows:auto 1fr;gap:14px;height:100%}
+.carstage{grid-row:1/3;display:flex;flex-direction:column}
+.carwrap{flex:1;position:relative;display:grid;place-items:center;margin:6px 0 10px}
+.carwrap svg{width:82%;max-width:280px;filter:drop-shadow(0 14px 30px rgba(52,224,212,.14))}
+.doorpin{position:absolute;width:20px;height:20px;border-radius:50%;border:2px solid var(--panel);
+  display:grid;place-items:center;background:var(--good);box-shadow:0 0 0 3px rgba(53,214,122,.18)}
+.doorpin.open{background:var(--warn);box-shadow:0 0 0 3px rgba(255,176,32,.22)}
+.drvmodes{display:flex;gap:8px}
+.mode{flex:1;padding:10px;border-radius:12px;border:1px solid var(--line);text-align:center;font-size:12px;color:var(--muted)}
+.mode.on{color:var(--accent-ink);background:var(--accent);border-color:var(--accent);font-weight:600}
+.statrow{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line-soft)}
+.statrow:last-child{border-bottom:0}
+.statrow .si{width:34px;height:34px;border-radius:10px;background:var(--panel-3);display:grid;place-items:center;color:var(--accent);flex:none}
+.statrow .si svg{width:18px;height:18px}
+.statrow .sv{margin-left:auto;font-size:15px;font-weight:600;font-variant-numeric:tabular-nums}
+.statrow .sl{font-size:12px;color:var(--muted)}
+.tpms{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tp{background:var(--panel);border:1px solid var(--line-soft);border-radius:12px;padding:10px;text-align:center}
+.tp .v{font-size:17px;font-weight:600;font-variant-numeric:tabular-nums}
+.tp .u{font-size:9.5px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase}
+.tp.low{border-color:rgba(255,176,32,.5)} .tp.low .v{color:var(--warn)}
+/* OTA */
+.ota .rowh{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.ota .ver{margin-left:auto;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ota .relname{font-size:14px;font-weight:600}
+.ota .note{font-size:11.5px;color:var(--muted);line-height:1.5;margin:2px 0 14px}
+.ota .comp{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);padding:6px 0;border-bottom:1px solid var(--line-soft)}
+.ota .comp b{color:var(--ink);font-weight:500}
+.ota .comp .st{color:var(--good)}
+.installbar{height:8px;border-radius:8px;background:var(--line);overflow:hidden;margin:14px 0 8px}
+.installbar>i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--nav));transition:width .4s}
+.btn{width:100%;padding:13px;border-radius:14px;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:14px;transition:.16s}
+.btn:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--ink);font-weight:600}
+.btn[disabled]{opacity:.5;cursor:default}
+
+/* ===== PHONE ===== */
+#phone .wrap{display:grid;grid-template-columns:1fr 300px;gap:16px;height:100%}
+.calls .crow{display:flex;align-items:center;gap:13px;padding:12px 6px;border-bottom:1px solid var(--line-soft)}
+.calls .crow .av{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#4A5A73,#28344A);display:grid;place-items:center;font-weight:700;font-size:14px;flex:none}
+.calls .cn{font-size:14px;font-weight:600}
+.calls .cs{font-size:11.5px;color:var(--muted);display:flex;gap:6px;align-items:center;margin-top:1px}
+.calls .cs svg{width:12px;height:12px}
+.calls .cs.miss{color:var(--crit)}
+.calls .ct{margin-left:auto;font-size:11px;color:var(--muted)}
+.calls .callbtn{width:34px;height:34px;border-radius:50%;background:rgba(53,214,122,.14);color:var(--good);display:grid;place-items:center;margin-left:10px}
+.calls .callbtn svg{width:16px;height:16px}
+.dial{display:flex;flex-direction:column}
+.dialout{text-align:center;font-size:26px;font-weight:500;letter-spacing:.06em;min-height:34px;margin-bottom:12px;font-variant-numeric:tabular-nums}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.key{aspect-ratio:1.5;border-radius:14px;background:var(--panel);border:1px solid var(--line-soft);font-size:20px;font-weight:500;transition:.12s}
+.key:hover{background:var(--panel-3)}
+.key small{display:block;font-size:8px;letter-spacing:.14em;color:var(--muted);margin-top:1px}
+.dialcall{margin-top:12px;padding:14px;border-radius:16px;background:var(--good);color:#052012;font-weight:700;display:grid;place-items:center}
+
+/* ===== SETTINGS ===== */
+#set .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px;height:100%;align-content:start}
+.setgrp .srow{display:flex;align-items:center;gap:13px;padding:14px 0;border-bottom:1px solid var(--line-soft)}
+.setgrp .srow:last-child{border-bottom:0}
+.setgrp .si{width:32px;height:32px;border-radius:9px;background:var(--panel-3);display:grid;place-items:center;color:var(--accent);flex:none}
+.setgrp .si svg{width:17px;height:17px}
+.setgrp .sn{font-size:13.5px;font-weight:600}
+.setgrp .sd{font-size:11px;color:var(--muted);margin-top:1px}
+.setgrp .ctl{margin-left:auto}
+.toggle{width:46px;height:27px;border-radius:999px;background:var(--line);position:relative;transition:.2s;flex:none}
+.toggle i{position:absolute;top:3px;left:3px;width:21px;height:21px;border-radius:50%;background:#fff;transition:.2s}
+.toggle.on{background:var(--accent)} .toggle.on i{left:22px}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{padding:7px 12px;font-size:12px;color:var(--muted)}
+.seg button.on{background:var(--accent);color:var(--accent-ink);font-weight:600}
+
+/* ---- Climate dock ---- */
+.climate{grid-area:climate;border-top:1px solid var(--line-soft);
+  background:linear-gradient(0deg,rgba(255,255,255,.02),transparent);
+  display:flex;align-items:center;gap:16px;padding:12px 20px}
+.zone{display:flex;align-items:center;gap:12px}
+.zone .lbl{margin:0}
+.tempctl{display:flex;align-items:center;gap:10px}
+.tempctl button{width:34px;height:34px;border-radius:50%;background:var(--panel-2);border:1px solid var(--line);
+  display:grid;place-items:center;font-size:20px;color:var(--ink);line-height:0}
+.tempctl button:hover{background:var(--panel-3)}
+.tempctl .tval{font-size:26px;font-weight:600;min-width:74px;text-align:center;font-variant-numeric:tabular-nums}
+.tempctl .tval i{font-size:14px;color:var(--muted);font-style:normal}
+.cspacer{flex:1}
+.cbtns{display:flex;gap:9px}
+.cbtn{width:44px;height:44px;border-radius:13px;background:var(--panel-2);border:1px solid var(--line);
+  display:grid;place-items:center;color:var(--muted);transition:.15s;position:relative}
+.cbtn svg{width:21px;height:21px}
+.cbtn:hover{color:var(--ink);background:var(--panel-3)}
+.cbtn.on{color:var(--accent-ink);background:var(--accent);border-color:var(--accent)}
+.cbtn small{position:absolute;bottom:-16px;left:50%;transform:translateX(-50%);font-size:8px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.fan{display:flex;align-items:center;gap:9px;padding:0 6px}
+.fan .bars{display:flex;gap:3px;align-items:flex-end;height:26px}
+.fan .bars i{width:5px;border-radius:2px;background:var(--line);height:30%}
+.fan .bars i.on{background:var(--accent)}
+.fan button{width:28px;height:28px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line);display:grid;place-items:center;font-size:16px;color:var(--ink);line-height:0}
+
+.hint{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);font-size:11px;color:#4A5567;letter-spacing:.04em}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+@media (max-width:640px){.dock small,.napp small{display:none}.tiles{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<main class="bezel" role="application" aria-label="Vehicle infotainment display">
+  <div class="screen">
+
+    <!-- ============ DOCK ============ -->
+    <nav class="dock" aria-label="Apps">
+      <div class="brand" title="Software-Defined Vehicle">SDV</div>
+      <button class="napp on" data-view="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg><small>Home</small></button>
+      <button class="napp" data-view="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21s7-6.5 7-12a7 7 0 10-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.4"/></svg><small>Maps</small></button>
+      <button class="napp" data-view="media"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/></svg><small>Media</small></button>
+      <button class="napp" data-view="phone"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 16.9v3a2 2 0 01-2.2 2 19.8 19.8 0 01-8.6-3.1 19.5 19.5 0 01-6-6A19.8 19.8 0 012 4.2 2 2 0 014 2h3a2 2 0 012 1.7c.1.9.4 1.8.7 2.7a2 2 0 01-.5 2.1L8.1 9.6a16 16 0 006 6l1.1-1.1a2 2 0 012.1-.5c.9.3 1.8.6 2.7.7A2 2 0 0122 16.9z"/></svg><small>Phone</small></button>
+      <button class="napp" data-view="veh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 13l1.5-4.5A2 2 0 018.4 7h7.2a2 2 0 011.9 1.5L19 13"/><path d="M4 13h16v4a1 1 0 01-1 1h-1a1 1 0 01-1-1v-1H7v1a1 1 0 01-1 1H5a1 1 0 01-1-1z"/><circle cx="7.5" cy="15.5" r="0.6"/><circle cx="16.5" cy="15.5" r="0.6"/></svg><small>Car</small></button>
+      <button class="napp" data-view="set"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.6 1.6 0 00-2.7 1.1V21a2 2 0 01-4 0v-.1A1.6 1.6 0 007 19.4a1.6 1.6 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1A1.6 1.6 0 004.6 15a1.6 1.6 0 00-1.5-1H3a2 2 0 010-4h.1A1.6 1.6 0 004.6 9a1.6 1.6 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1A1.6 1.6 0 009 4.6a1.6 1.6 0 001-1.5V3a2 2 0 014 0v.1A1.6 1.6 0 0019 4.6a1.6 1.6 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1A1.6 1.6 0 0019.4 9v0a1.6 1.6 0 001.5 1H21a2 2 0 010 4h-.1a1.6 1.6 0 00-1.5 1z"/></svg><small>Settings</small></button>
+      <div class="spring"></div>
+      <button class="napp" data-view="veh" title="Charging"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 2L4.5 13.5H11L11 22 19.5 10.5H13z"/></svg><small>Charge</small></button>
+    </nav>
+
+    <!-- ============ STATUS STRIP ============ -->
+    <header class="status">
+      <div class="gear" aria-label="Drive selector">
+        <b>P</b><b>R</b><b>N</b><b class="on d">D</b>
+      </div>
+      <div class="mini-speed"><b class="tnum" id="spd">0</b> mph</div>
+      <div class="clock">
+        <div class="t tnum" id="clk">—:—</div>
+        <div class="d" id="date">—</div>
+      </div>
+      <div class="right">
+        <div class="otemp">Outside <b class="tnum">71°</b></div>
+        <div class="icns">
+          <span class="lte">LTE</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12.5a10 10 0 0114 0"/><path d="M8.5 15.5a5 5 0 017 0"/><circle cx="12" cy="18.5" r="1" fill="currentColor" stroke="none"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 8l10 8-5 4V4l5 4-10 8"/></svg>
+        </div>
+        <div class="prof">
+          <div class="avatar">JE</div>
+          <small>James</small>
+        </div>
+      </div>
+    </header>
+
+    <!-- ============ CANVAS ============ -->
+    <section class="canvas">
+
+      <!-- ===== HOME ===== -->
+      <div class="view on" id="home">
+        <div class="grid">
+          <div class="map" data-view="nav" id="homemap">
+            <canvas class="mapcanvas" width="700" height="440" style="width:100%;height:100%;display:block"></canvas>
+            <div class="over">
+              <div class="eta">
+                <div class="big">18 min · <span class="tnum">7.4</span> mi</div>
+                <div class="sub">Arrive 4:52 PM · via I-280 N</div>
+              </div>
+              <div class="dest">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.5 7-12a7 7 0 10-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2"/></svg>
+                Supercharger — Palo Alto
+              </div>
+            </div>
+          </div>
+
+          <div class="card pad nowcard">
+            <div class="art"></div>
+            <div class="meta">
+              <div class="ttl" id="h-track">Midnight City</div>
+              <div class="art-artist" id="h-artist">M83</div>
+            </div>
+            <div class="mini-ctrl">
+              <button data-mact="prev" aria-label="Previous"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2v14H6zM20 5v14l-11-7z"/></svg></button>
+              <button class="play" data-mact="play" aria-label="Play/Pause"><svg class="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+              <button data-mact="next" aria-label="Next"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5l11 7-11 7z"/></svg></button>
+            </div>
+          </div>
+
+          <div class="card pad evsum">
+            <div class="h"><span class="lbl">Battery</span><span class="chip ok"><span class="dotpulse"></span>Ready</span></div>
+            <div class="evtop">
+              <div class="ring" id="socring" style="--p:72"><b class="tnum" id="soc">72<i>%</i></b></div>
+              <div class="rng">
+                <div class="big tnum"><span id="rangeval">241</span> <i>mi</i></div>
+                <div class="sub">Est. range · Eco climate</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tiles">
+            <button class="tile" data-view="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21s7-6.5 7-12a7 7 0 10-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.4"/></svg><span class="tn">Navigate</span><span class="ts">Palo Alto · 18 min</span></button>
+            <button class="tile" data-view="veh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 2L4.5 13.5H11L11 22 19.5 10.5H13z"/></svg><span class="tn">Charging</span><span class="ts">Not plugged in</span></button>
+            <button class="tile warn" data-view="veh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="14" r="6"/><path d="M12 11v3l2 1M9 3h6"/></svg><span class="tn">Tire pressure</span><span class="ts">Rear-left 29 psi</span></button>
+            <button class="tile" data-view="veh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l7 4v6c0 5-3 8-7 10-4-2-7-5-7-10V6z"/><path d="M9.5 12l2 2 3.5-4"/></svg><span class="tn">Software</span><span class="ts">Update available</span></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== NAV ===== -->
+      <div class="view" id="nav">
+        <div class="wrap">
+          <div class="bigmap">
+            <canvas class="mapcanvas" width="720" height="560" style="width:100%;height:100%;display:block"></canvas>
+            <div class="searchbar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+              <span>Search for a place or address…</span>
+            </div>
+            <div class="turnstrip">
+              <div class="arw"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 20V7M6 11l6-6 6 6"/></svg></div>
+              <div>
+                <div class="big"><span class="tnum">0.4</span> mi</div>
+                <div class="sub">Continue onto I-280 North</div>
+              </div>
+            </div>
+          </div>
+          <div class="card pad route-panel">
+            <div class="h"><span class="lbl">Route</span><span class="chip">18 min · 7.4 mi</span></div>
+            <div class="stop"><div class="pin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/></svg></div><div><div class="sn">Current location</div><div class="ss">Mountain View, CA</div></div><div class="dist">now</div></div>
+            <div class="stop"><div class="pin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20V7M6 11l6-6 6 6"/></svg></div><div><div class="sn">I-280 North</div><div class="ss">Continue for 5.1 mi</div></div><div class="dist">0.4 mi</div></div>
+            <div class="stop"><div class="pin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></div><div><div class="sn">Exit 20 — Sand Hill Rd</div><div class="ss">Keep right</div></div><div class="dist">5.5 mi</div></div>
+            <div class="stop"><div class="pin" style="color:var(--good)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s7-6.5 7-12a7 7 0 10-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2"/></svg></div><div><div class="sn">Supercharger — Palo Alto</div><div class="ss">16 stalls · 8 available</div></div><div class="dist">7.4 mi</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== MEDIA ===== -->
+      <div class="view" id="media">
+        <div class="wrap">
+          <div class="player">
+            <div class="bigart"><div class="eq"><i style="animation-delay:0s"></i><i style="animation-delay:.15s"></i><i style="animation-delay:.3s"></i><i style="animation-delay:.1s"></i><i style="animation-delay:.35s"></i><i style="animation-delay:.2s"></i><i style="animation-delay:.05s"></i><i style="animation-delay:.28s"></i><i style="animation-delay:.12s"></i><i style="animation-delay:.4s"></i><i style="animation-delay:.22s"></i><i style="animation-delay:.08s"></i></div></div>
+            <div class="trk">
+              <div class="tt" id="m-track">Midnight City</div>
+              <div class="ta" id="m-artist">M83 · Hurry Up, We're Dreaming</div>
+              <div class="scrub"><div class="bar"><i id="m-prog"></i></div><div class="times"><span id="m-cur">1:34</span><span id="m-dur">4:03</span></div></div>
+            </div>
+            <div class="ctrl">
+              <button class="sm" data-mact="shuffle" aria-label="Shuffle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg></button>
+              <button data-mact="prev" aria-label="Previous"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2v14H6zM20 5v14l-11-7z"/></svg></button>
+              <button class="play" data-mact="play" aria-label="Play/Pause"><svg class="i-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+              <button data-mact="next" aria-label="Next"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5l11 7-11 7z"/></svg></button>
+              <button class="sm" data-mact="repeat" aria-label="Repeat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg></button>
+            </div>
+          </div>
+          <div class="card pad" style="display:flex;flex-direction:column;overflow:hidden">
+            <div class="sources">
+              <button class="src on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 8l10 8-5 4V4l5 4-10 8"/></svg>Bluetooth</button>
+              <button class="src"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/></svg>Radio</button>
+              <button class="src"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="2" width="6" height="10" rx="3"/><path d="M12 12v6M8 20h8"/></svg>USB</button>
+              <button class="src"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16v10H4zM8 20h8M12 15v5"/></svg>Podcasts</button>
+            </div>
+            <div class="lbl" style="margin-bottom:6px">Up next</div>
+            <div class="queue" id="queue"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== PHONE ===== -->
+      <div class="view" id="phone">
+        <div class="wrap">
+          <div class="card pad calls" style="overflow:auto">
+            <div class="h"><span class="lbl">Recent calls</span><span class="chip"><span class="dotpulse" style="background:var(--nav);box-shadow:none"></span>iPhone · James</span></div>
+            <div class="crow"><div class="av">SM</div><div><div class="cn">Sarah Mitchell</div><div class="cs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 14l-4-4 4-4"/><path d="M4 10h9a7 7 0 017 7v0"/></svg>Outgoing · Mobile</div></div><div class="ct">10:24 AM</div><button class="callbtn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 15.5a12 12 0 01-4-.6 1 1 0 00-1 .2l-1.8 1.8a15 15 0 01-6.3-6.3l1.8-1.8a1 1 0 00.2-1 12 12 0 01-.6-4 1 1 0 00-1-1H4a1 1 0 00-1 1A17 17 0 0020 21a1 1 0 001-1v-3.5a1 1 0 00-1-1z"/></svg></button></div>
+            <div class="crow"><div class="av">DK</div><div><div class="cn">David Kim</div><div class="cs miss"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l16 16M20 8v8h-8"/></svg>Missed · Work</div></div><div class="ct">Yesterday</div><button class="callbtn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 15.5a12 12 0 01-4-.6 1 1 0 00-1 .2l-1.8 1.8a15 15 0 01-6.3-6.3l1.8-1.8a1 1 0 00.2-1 12 12 0 01-.6-4 1 1 0 00-1-1H4a1 1 0 00-1 1A17 17 0 0020 21a1 1 0 001-1v-3.5a1 1 0 00-1-1z"/></svg></button></div>
+            <div class="crow"><div class="av">MG</div><div><div class="cn">Mom</div><div class="cs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 14l4-4-4-4"/><path d="M20 10h-9a7 7 0 00-7 7v0"/></svg>Incoming · Mobile</div></div><div class="ct">Yesterday</div><button class="callbtn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 15.5a12 12 0 01-4-.6 1 1 0 00-1 .2l-1.8 1.8a15 15 0 01-6.3-6.3l1.8-1.8a1 1 0 00.2-1 12 12 0 01-.6-4 1 1 0 00-1-1H4a1 1 0 00-1 1A17 17 0 0020 21a1 1 0 001-1v-3.5a1 1 0 00-1-1z"/></svg></button></div>
+            <div class="crow"><div class="av">GA</div><div><div class="cn">Garage — Service</div><div class="cs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 14l-4-4 4-4"/><path d="M4 10h9a7 7 0 017 7v0"/></svg>Outgoing · Work</div></div><div class="ct">Mon</div><button class="callbtn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 15.5a12 12 0 01-4-.6 1 1 0 00-1 .2l-1.8 1.8a15 15 0 01-6.3-6.3l1.8-1.8a1 1 0 00.2-1 12 12 0 01-.6-4 1 1 0 00-1-1H4a1 1 0 00-1 1A17 17 0 0020 21a1 1 0 001-1v-3.5a1 1 0 00-1-1z"/></svg></button></div>
+          </div>
+          <div class="card pad dial">
+            <div class="dialout" id="dialout"></div>
+            <div class="pad" id="keypad"></div>
+            <button class="dialcall">Call</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== VEHICLE (EV + SDV/OTA) ===== -->
+      <div class="view" id="veh">
+        <div class="grid">
+          <div class="card pad carstage">
+            <div class="h"><span class="lbl">Vehicle status</span><span class="chip ok"><span class="dotpulse"></span>Locked · Parked</span></div>
+            <div class="carwrap">
+              <svg viewBox="0 0 240 130" fill="none" stroke="var(--accent)" stroke-width="2" aria-label="Top view of vehicle">
+                <rect x="40" y="20" width="160" height="90" rx="34"/>
+                <path d="M62 24c8-6 108-6 116 0M62 106c8 6 108 6 116 0"/>
+                <rect x="72" y="40" width="96" height="50" rx="18" stroke-opacity=".45"/>
+                <line x1="120" y1="40" x2="120" y2="90" stroke-opacity=".35"/>
+              </svg>
+              <div class="doorpin" style="top:30%;left:30%" title="Front-left door: closed"></div>
+              <div class="doorpin" style="top:30%;right:30%" title="Front-right door: closed"></div>
+              <div class="doorpin open" style="bottom:26%;left:30%" title="Rear-left door: ajar"></div>
+              <div class="doorpin" style="bottom:26%;right:30%" title="Trunk: closed"></div>
+            </div>
+            <div class="lbl" style="margin-bottom:8px">Drive mode</div>
+            <div class="drvmodes" id="drvmodes">
+              <button class="mode">Chill</button>
+              <button class="mode on">Standard</button>
+              <button class="mode">Sport</button>
+              <button class="mode">Off-road</button>
+            </div>
+          </div>
+
+          <div class="card pad">
+            <div class="h"><span class="lbl">Energy &amp; range</span></div>
+            <div class="statrow"><div class="si"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="8" width="16" height="9" rx="2"/><path d="M19 11h2v3h-2"/><rect x="5.5" y="10.5" width="9" height="4"/></svg></div><div><div class="sn" style="font-size:13px;font-weight:600">State of charge</div><div class="sl">72% · 68.4 kWh usable</div></div><div class="sv tnum" style="color:var(--good)">72%</div></div>
+            <div class="statrow"><div class="si"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v18M5 10l7-7 7 7"/></svg></div><div><div class="sn" style="font-size:13px;font-weight:600">Est. range</div><div class="sl">EPA 316 mi · Eco climate</div></div><div class="sv tnum">241 mi</div></div>
+            <div class="statrow"><div class="si"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 2L4.5 13.5H11L11 22 19.5 10.5H13z"/></svg></div><div><div class="sn" style="font-size:13px;font-weight:600">Efficiency</div><div class="sl">Last 30 mi average</div></div><div class="sv tnum">247 Wh/mi</div></div>
+            <div class="statrow"><div class="si"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div><div><div class="sn" style="font-size:13px;font-weight:600">Time to 80%</div><div class="sl">At 250 kW Supercharger</div></div><div class="sv tnum">18 min</div></div>
+            <div class="lbl" style="margin:16px 0 10px">Tire pressure</div>
+            <div class="tpms">
+              <div class="tp"><div class="v tnum">34</div><div class="u">FL · psi</div></div>
+              <div class="tp"><div class="v tnum">34</div><div class="u">FR · psi</div></div>
+              <div class="tp low"><div class="v tnum">29</div><div class="u">RL · psi</div></div>
+              <div class="tp"><div class="v tnum">33</div><div class="u">RR · psi</div></div>
+            </div>
+          </div>
+
+          <div class="card pad ota">
+            <div class="rowh"><span class="lbl">Software</span><span class="ver">v2026.20.4 → 2026.24.1</span></div>
+            <div class="relname">Summer Release 2026.24.1</div>
+            <div class="note">Adaptive regen tuning, sharper reverse camera, new charging-stop planner, and security patches for the connectivity stack.</div>
+            <div class="comp"><span>Vehicle Control · <b>VCU</b></span><span class="st">ready</span></div>
+            <div class="comp"><span>Infotainment · <b>IVI</b></span><span class="st">ready</span></div>
+            <div class="comp"><span>Driver Assist · <b>ADAS</b></span><span class="st">ready</span></div>
+            <div class="comp"><span>Battery Mgmt · <b>BMS</b></span><span class="st">ready</span></div>
+            <div class="installbar"><i id="otabar"></i></div>
+            <div class="lbl" id="otastat" style="margin-bottom:12px">Downloaded · 412 MB · ready to install</div>
+            <button class="btn" id="otabtn">Install now — vehicle is parked</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== SETTINGS ===== -->
+      <div class="view" id="set">
+        <div class="cols">
+          <div class="card pad setgrp">
+            <div class="h"><span class="lbl">Vehicle</span></div>
+            <div class="srow"><div class="si"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></div><div><div class="sn">Walk-away lock</div><div class="sd">Lock when phone key leaves</div></div><div class="ctl"><div class="toggle on" data-toggle><i></i></div></div></div>
+            <div class="srow"><div class="si"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v18M5 10l7-7 7 7"/></svg></div><div><div class="sn">Regenerative braking</div><div class="sd">Standard · one-pedal drive</div></div><div class="ctl"><div class="seg"><button>Low</button><button class="on">Std</button></div></div></div>
+            <div class="srow"><div class="si"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></div><div><div class="sn">Acceleration alerts</div><div class="sd">Chime on hard launch</div></div><div class="ctl"><div class="toggle" data-toggle><i></i></div></div></div>
+            <div class="srow"><div class="si"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l7 4v6c0 5-3 8-7 10-4-2-7-5-7-10V6z"/></svg></div><div><div class="sn">Sentry mode</div><div class="sd">Record when parked</div></div><div class="ctl"><div class="toggle on" data-toggle><i></i></div></div></div>
+          </div>
+          <div class="card pad setgrp">
+            <div class="h"><span class="lbl">Display &amp; connectivity</span></div>
+            <div class="srow"><div class="si"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></div><div><div class="sn">Display theme</div><div class="sd">Auto dims with headlights</div></div><div class="ctl"><div class="seg"><button>Day</button><button class="on">Auto</button><button>Night</button></div></div></div>
+            <div class="srow"><div class="si"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 8l10 8-5 4V4l5 4-10 8"/></svg></div><div><div class="sn">Bluetooth</div><div class="sd">iPhone · James — connected</div></div><div class="ctl"><div class="toggle on" data-toggle><i></i></div></div></div>
+            <div class="srow"><div class="si"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 12.5a10 10 0 0114 0"/><path d="M8.5 15.5a5 5 0 017 0"/><circle cx="12" cy="18.5" r="1"/></svg></div><div><div class="sn">Wi-Fi</div><div class="sd">Home_Garage_5G</div></div><div class="ctl"><div class="toggle on" data-toggle><i></i></div></div></div>
+            <div class="srow"><div class="si"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l7 4v6c0 5-3 8-7 10-4-2-7-5-7-10V6z"/><path d="M9.5 12l2 2 3.5-4"/></svg></div><div><div class="sn">Automatic updates</div><div class="sd">Install overnight while parked</div></div><div class="ctl"><div class="toggle on" data-toggle><i></i></div></div></div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ============ CLIMATE DOCK ============ -->
+    <footer class="climate" aria-label="Climate controls">
+      <div class="zone">
+        <span class="lbl">Driver</span>
+        <div class="tempctl" data-zone="driver">
+          <button data-t="-1" aria-label="Cooler">–</button>
+          <span class="tval"><span class="v tnum">70</span><i>°F</i></span>
+          <button data-t="1" aria-label="Warmer">+</button>
+        </div>
+      </div>
+      <div class="fan">
+        <button data-fan="-1" aria-label="Fan down">–</button>
+        <div class="bars" id="fanbars"></div>
+        <button data-fan="1" aria-label="Fan up">+</button>
+      </div>
+      <div class="cspacer"></div>
+      <div class="cbtns">
+        <button class="cbtn on" data-c title="Auto climate">AUTO</button>
+        <button class="cbtn" data-c aria-label="A/C"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M2 12h20M5 5l14 14M19 5L5 19"/></svg><small>A/C</small></button>
+        <button class="cbtn" data-c aria-label="Front defrost"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 14a5 5 0 015-5h6a4 4 0 000-8"/><path d="M7 20v-2M11 21v-3M15 20v-2"/></svg><small>Defrost</small></button>
+        <button class="cbtn" data-c aria-label="Driver seat heat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 4v8a3 3 0 003 3h3l4 4"/><path d="M8 20l3-3M14 8l-2-2 2-2"/></svg><small>Seat</small></button>
+        <button class="cbtn" data-c aria-label="Recirculate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14M7 22l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg><small>Recirc</small></button>
+        <button class="cbtn" data-c title="Sync zones">SYNC</button>
+      </div>
+      <div class="cspacer"></div>
+      <div class="zone">
+        <span class="lbl">Passenger</span>
+        <div class="tempctl" data-zone="pass">
+          <button data-t="-1" aria-label="Cooler">–</button>
+          <span class="tval"><span class="v tnum">72</span><i>°F</i></span>
+          <button data-t="1" aria-label="Warmer">+</button>
+        </div>
+      </div>
+    </footer>
+
+  </div>
+</main>
+<div class="hint">SDV Cockpit — a software-defined-vehicle infotainment HMI · tap the dock, climate, media &amp; drive controls</div>
+
+<script>
+(function(){
+  "use strict";
+  var reduce = matchMedia("(prefers-reduced-motion:reduce)").matches;
+
+  /* ---------- App switching ---------- */
+  var apps = document.querySelectorAll(".napp");
+  var views = document.querySelectorAll(".view");
+  function show(id){
+    views.forEach(function(v){v.classList.toggle("on", v.id===id);});
+    apps.forEach(function(a){a.classList.toggle("on", a.dataset.view===id);});
+  }
+  document.querySelectorAll("[data-view]").forEach(function(el){
+    el.addEventListener("click", function(){ show(el.dataset.view); });
+  });
+
+  /* ---------- Clock ---------- */
+  var clk=document.getElementById("clk"), dateEl=document.getElementById("date");
+  function tick(){
+    var d=new Date();
+    var h=d.getHours(), m=d.getMinutes(), ap=h>=12?"PM":"AM";
+    h=h%12; if(h===0)h=12;
+    clk.textContent=h+":"+(m<10?"0":"")+m+" "+ap;
+    dateEl.textContent=d.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"}).toUpperCase();
+  }
+  tick(); setInterval(tick,10000);
+
+  /* ---------- Climate ---------- */
+  document.querySelectorAll(".tempctl").forEach(function(tc){
+    var v=tc.querySelector(".v");
+    tc.querySelectorAll("button").forEach(function(b){
+      b.addEventListener("click", function(){
+        var n=parseInt(v.textContent,10)+parseInt(b.dataset.t,10);
+        n=Math.max(60,Math.min(85,n)); v.textContent=n;
+      });
+    });
+  });
+  var fan=3, fanbars=document.getElementById("fanbars");
+  for(var i=0;i<5;i++){var bi=document.createElement("i");bi.style.height=(30+i*14)+"%";fanbars.appendChild(bi);}
+  function drawFan(){fanbars.querySelectorAll("i").forEach(function(el,ix){el.classList.toggle("on",ix<fan);});}
+  drawFan();
+  document.querySelectorAll("[data-fan]").forEach(function(b){
+    b.addEventListener("click",function(){fan=Math.max(0,Math.min(5,fan+parseInt(b.dataset.fan,10)));drawFan();});
+  });
+  document.querySelectorAll(".cbtn[data-c]").forEach(function(b){
+    b.addEventListener("click",function(){b.classList.toggle("on");});
+  });
+
+  /* ---------- Drive modes ---------- */
+  var modes=document.querySelectorAll("#drvmodes .mode");
+  modes.forEach(function(m){m.addEventListener("click",function(){modes.forEach(function(x){x.classList.remove("on");});m.classList.add("on");});});
+
+  /* ---------- Toggles / segments in settings ---------- */
+  document.querySelectorAll("[data-toggle]").forEach(function(t){t.addEventListener("click",function(){t.classList.toggle("on");});});
+  document.querySelectorAll(".seg").forEach(function(s){
+    s.querySelectorAll("button").forEach(function(b){b.addEventListener("click",function(){s.querySelectorAll("button").forEach(function(x){x.classList.remove("on");});b.classList.add("on");});});
+  });
+
+  /* ---------- Media ---------- */
+  var tracks=[
+    {t:"Midnight City", a:"M83", al:"Hurry Up, We're Dreaming", d:243},
+    {t:"Nightcall", a:"Kavinsky", al:"OutRun", d:258},
+    {t:"Instant Crush", a:"Daft Punk", al:"Random Access Memories", d:337},
+    {t:"The Less I Know The Better", a:"Tame Impala", al:"Currents", d:216},
+    {t:"Redbone", a:"Childish Gambino", al:"Awaken, My Love!", d:327},
+    {t:"Electric Feel", a:"MGMT", al:"Oracular Spectacular", d:229}
+  ];
+  var cur=0, playing=true, pos=94;
+  function fmt(s){s=Math.max(0,Math.floor(s));return Math.floor(s/60)+":"+(s%60<10?"0":"")+(s%60);}
+  function renderQueue(){
+    var q=document.getElementById("queue"); q.innerHTML="";
+    tracks.forEach(function(tr,ix){
+      var row=document.createElement("div"); row.className="qrow"+(ix===cur?" on":"");
+      row.innerHTML='<div class="qart"></div><div><div class="qn">'+tr.t+'</div><div class="qa">'+tr.a+'</div></div><div class="qd">'+fmt(tr.d)+'</div>';
+      row.addEventListener("click",function(){cur=ix;pos=0;playing=true;syncTrack();});
+      q.appendChild(row);
+    });
+  }
+  function syncTrack(){
+    var tr=tracks[cur];
+    document.getElementById("m-track").textContent=tr.t;
+    document.getElementById("m-artist").textContent=tr.a+" · "+tr.al;
+    document.getElementById("m-dur").textContent=fmt(tr.d);
+    document.getElementById("h-track").textContent=tr.t;
+    document.getElementById("h-artist").textContent=tr.a;
+    document.querySelectorAll(".i-play").forEach(function(ic){
+      ic.innerHTML = playing ? '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>' : '<path d="M8 5v14l11-7z"/>';
+    });
+    renderQueue();
+  }
+  function mediaTick(){
+    if(playing){ pos+=1; if(pos>=tracks[cur].d){cur=(cur+1)%tracks.length;pos=0;syncTrack();} }
+    document.getElementById("m-cur").textContent=fmt(pos);
+    document.getElementById("m-prog").style.width=(pos/tracks[cur].d*100)+"%";
+  }
+  document.querySelectorAll("[data-mact]").forEach(function(b){
+    b.addEventListener("click",function(){
+      var a=b.dataset.mact;
+      if(a==="play"){playing=!playing;}
+      else if(a==="next"){cur=(cur+1)%tracks.length;pos=0;playing=true;}
+      else if(a==="prev"){cur=(cur-1+tracks.length)%tracks.length;pos=0;playing=true;}
+      else if(a==="shuffle"||a==="repeat"){b.classList.toggle("on");return;}
+      syncTrack();
+    });
+  });
+  document.querySelectorAll(".src").forEach(function(s){s.addEventListener("click",function(){document.querySelectorAll(".src").forEach(function(x){x.classList.remove("on");});s.classList.add("on");});});
+  syncTrack(); if(!reduce) setInterval(mediaTick,1000);
+
+  /* ---------- Phone keypad ---------- */
+  var keys=[["1",""],["2","ABC"],["3","DEF"],["4","GHI"],["5","JKL"],["6","MNO"],["7","PQRS"],["8","TUV"],["9","WXYZ"],["*",""],["0","+"],["#",""]];
+  var kp=document.getElementById("keypad"), out=document.getElementById("dialout"), buf="";
+  keys.forEach(function(k){
+    var b=document.createElement("button"); b.className="key";
+    b.innerHTML=k[0]+(k[1]?'<small>'+k[1]+'</small>':'');
+    b.addEventListener("click",function(){buf+=k[0]; out.textContent=buf.slice(-14);});
+    kp.appendChild(b);
+  });
+
+  /* ---------- OTA install ---------- */
+  var otabtn=document.getElementById("otabtn"), otabar=document.getElementById("otabar"), otastat=document.getElementById("otastat");
+  var installing=false;
+  otabtn.addEventListener("click",function(){
+    if(installing) return; installing=true;
+    otabtn.disabled=true; otabtn.textContent="Installing…";
+    var p=0;
+    var t=setInterval(function(){
+      p+=Math.random()*9+3; if(p>=100){p=100;clearInterval(t);
+        otastat.textContent="Update complete · now on v2026.24.1";
+        otabtn.textContent="Up to date"; }
+      else { otastat.textContent="Installing 2026.24.1 · "+Math.floor(p)+"% · do not power off"; }
+      otabar.style.width=p+"%";
+    }, reduce?120:520);
+  });
+
+  /* ---------- Live telemetry drift (speed, SoC, range) ---------- */
+  var spd=document.getElementById("spd");
+  var soc=72, rangeMi=241, socEl=document.getElementById("soc"), ring=document.getElementById("socring"),
+      rangeEl=document.getElementById("rangeval");
+  var speedTarget=0;
+  function telemetry(){
+    // wander a plausible city speed
+    speedTarget += (Math.random()-0.45)*8;
+    speedTarget = Math.max(0, Math.min(64, speedTarget));
+    spd.textContent = Math.round(speedTarget);
+    // slowly deplete
+    if(Math.random()<0.25 && soc>10){ soc-=1; rangeMi=Math.round(soc*3.35);
+      socEl.innerHTML=soc+'<i>%</i>'; ring.style.setProperty("--p",soc); rangeEl.textContent=rangeMi; }
+  }
+  if(!reduce) setInterval(telemetry, 1800);
+
+  /* ---------- Faux map renderer (canvas) ---------- */
+  document.querySelectorAll(".mapcanvas").forEach(function(cv){ setupMap(cv); });
+  function setupMap(cv){
+    var ctx=cv.getContext("2d"), W=cv.width, H=cv.height, off=0;
+    var roads=[];
+    for(var i=0;i<9;i++) roads.push({x:(i-1)*W/6, vert:true});
+    for(var j=0;j<7;j++) roads.push({y:(j-1)*H/5, vert:false});
+    // a pseudo route polyline
+    var route=[[0.12,0.9],[0.12,0.62],[0.34,0.62],[0.34,0.36],[0.58,0.36],[0.58,0.18],[0.82,0.18]];
+    function draw(){
+      ctx.fillStyle="#0B1017"; ctx.fillRect(0,0,W,H);
+      // subtle blocks
+      ctx.fillStyle="#0E141D";
+      for(var bx=0;bx<6;bx++)for(var by=0;by<5;by++){ if((bx+by)%2===0){ctx.fillRect(bx*W/6+6,by*H/5+6,W/6-12,H/5-12);} }
+      // roads
+      ctx.strokeStyle="#1B2634"; ctx.lineWidth=10;
+      roads.forEach(function(r){ ctx.beginPath();
+        if(r.vert){ctx.moveTo(r.x,0);ctx.lineTo(r.x,H);} else {ctx.moveTo(0,r.y);ctx.lineTo(W,r.y);} ctx.stroke(); });
+      ctx.strokeStyle="#243244"; ctx.lineWidth=2;
+      roads.forEach(function(r){ ctx.beginPath();
+        if(r.vert){ctx.moveTo(r.x,0);ctx.lineTo(r.x,H);} else {ctx.moveTo(0,r.y);ctx.lineTo(W,r.y);} ctx.stroke(); });
+      // route glow
+      ctx.lineJoin="round"; ctx.lineCap="round";
+      ctx.strokeStyle="rgba(75,155,255,.25)"; ctx.lineWidth=16; drawRoute();
+      ctx.strokeStyle="#4B9BFF"; ctx.lineWidth=7; drawRoute();
+      // animated dash overlay
+      ctx.setLineDash([2,20]); ctx.lineDashOffset=-off; ctx.strokeStyle="rgba(255,255,255,.7)"; ctx.lineWidth=3; drawRoute(); ctx.setLineDash([]);
+      // car marker (near start of route)
+      var cx=route[1][0]*W, cy=route[1][1]*H;
+      ctx.fillStyle="rgba(52,224,212,.18)"; ctx.beginPath(); ctx.arc(cx,cy,20,0,7); ctx.fill();
+      ctx.fillStyle="#34E0D4"; ctx.beginPath(); ctx.arc(cx,cy,7,0,7); ctx.fill();
+      ctx.strokeStyle="#062B29"; ctx.lineWidth=2; ctx.stroke();
+      // destination pin
+      var dx=route[route.length-1][0]*W, dy=route[route.length-1][1]*H;
+      ctx.fillStyle="#35D67A"; ctx.beginPath(); ctx.arc(dx,dy,6,0,7); ctx.fill();
+    }
+    function drawRoute(){ ctx.beginPath(); route.forEach(function(p,ix){ var x=p[0]*W,y=p[1]*H; ix?ctx.lineTo(x,y):ctx.moveTo(x,y); }); ctx.stroke(); }
+    draw();
+    if(!reduce){ (function loop(){ off=(off+0.8)%22; draw(); requestAnimationFrame(loop); })(); }
+  }
+})();
+</script>
+</body>
+</html>
